@@ -35,7 +35,7 @@ common/      jev_client.py  Jev 호출(재시도)   data.py  데이터 로더   
 base/        questions.json / questions.py  질문,  levels.py  수준 규칙,  guard_rule.py  기존 발동 규칙
 base-eval/   questions.py  levels.py
 expert11/    questions.py  levels.py
-data/        other_story_check.jsonl  (다른 사람 이야기 확인용 10개. 나머지 데이터는 아래처럼 받는다)
+data/        download.py  평가 데이터 받기,  other_story_check.jsonl  다른 사람 이야기 확인용 10개
 results/     결과 표
 ```
 
@@ -46,9 +46,11 @@ pip install requests pandas pyarrow
 echo "OPENROUTER_API_KEY=..." > .env          # git 에 올라가지 않는다
 ```
 
-데이터
-- CRADLE-Dialogue: https://huggingface.co/datasets/SungJoo/Cradle-Dialogue 의 `test/validation/train` parquet 를 `data/cradle/` 에
-- 일반 대화: 팀 저장소 guardrail-dataset 을 `data/guardrail-dataset/` 에 clone
+데이터는 저장소에 없고 스크립트로 받는다 ([data/README.md](data/README.md)):
+
+```bash
+python3 data/download.py
+```
 
 ```bash
 python3 common/run_judge.py --design base-eval --source cradle_test --dry-run   # 호출 수·글자 수만 확인
