@@ -1,0 +1,117 @@
+{
+ "suicide_risk": {
+  "type": "score",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Rate the most severe level described, whether past or present; timing is asked separately. How strongly does the writer express suicidal thinking about themselves?",
+  "criteria": [
+   "No emotional or suicidal content",
+   "Negative emotional change: sadness, stress, or hopelessness, but no thoughts of death or suicide",
+   "Passive suicidal ideation: wishes to be dead, not wake up, or disappear; feels life is not worth living",
+   "Active suicidal ideation: thoughts of killing oneself, including when the writer says they are suicidal or want to kill themselves while talking about something else, or reports a suicide attempt they just made or are making now (e.g. 'I took a bottle of pills', 'attempt 1 hr ago', 'did it', 'failed again')"
+  ]
+ },
+ "self_harm": {
+  "type": "score",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Rate the most severe level described, whether past or present; timing is asked separately. How severe is the non-suicidal self-injury the writer expresses about themselves? Do not count suicidal thoughts or suicide attempts here.",
+  "criteria": [
+   "No self-harm content",
+   "Indirect reference only: old scars, talking about self-harm in general, or past self-harm that is over; no current urges or acts",
+   "Self-harm urges or thoughts without acting, including urges during a clean streak (e.g. 'the urges are getting strong', 'I want to cut', '7 days clean but struggling')",
+   "Self-harm acts, including indirect wording when the context is self-harm (e.g. 'I relapsed', 'broke my streak', 'I messed up again', 'did it last night') and descriptions of fresh cuts, wounds, or marks on their own body that they made, even without naming self-harm (e.g. 'new marks everywhere', 'a cut on my forearm from an hour ago')"
+  ]
+ },
+ "sh_severe": {
+  "type": "noul",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Does the writer describe non-suicidal self-injury of their own that is severe? Do not count suicidal thoughts, suicide plans, or suicide attempts here.",
+  "criteria": {
+   "true": "Repeated or habitual self-harm, escalating injuries or new methods, needing medical care, or loss of control",
+   "false": "No self-harm, or only urges or occasional minor acts"
+  }
+ },
+ "subject": {
+  "type": "choice",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Whose situation does any suicide or self-harm content describe?",
+  "criteria": {
+   "self": "The writer themselves, including the writer's own feelings about suicide (e.g. envy of people who died by suicide, wishing they had the courage)",
+   "both": "Both the writer and someone else (e.g. a friend's suicide and the writer's own thoughts)",
+   "other": "Only someone else, fiction, news, jokes, or a hypothetical; nothing about the writer's own risk",
+   "none": "The text is not about suicide or self-harm at all"
+  }
+ },
+ "si_timeframe": {
+  "type": "choice",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. When does the writer have their own suicidal thoughts (including wishing to be dead)?",
+  "criteria": {
+   "current": "Now or recently, including a recent attempt or its aftermath (today, last night, days ago) and suicidal thoughts or attempts stated in the present tense",
+   "past_only": "Only in the past: the writer says it is over, or clearly describes their life as better now (e.g. recovered, 'no longer suicidal', 'got a job and restarted my life'). A recent attempt is not past.",
+   "none": "The writer expresses no suicidal thoughts of their own at all"
+  }
+ },
+ "sh_timeframe": {
+  "type": "choice",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. When does the writer have their own non-suicidal self-harm (acts or urges)?",
+  "criteria": {
+   "current": "Self-harm acts or urges now or recently (e.g. cut last night, urges this week, relapsed)",
+   "past_only": "Self-harm only in the past and the writer says they stopped or recovered (e.g. 'clean for a year')",
+   "none": "No self-harm of their own; suicidal thoughts alone do not count as self-harm"
+  }
+ },
+ "cssrs_method": {
+  "type": "noul",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Does the writer mention a specific method, means, or place for their own possible suicide? Count questions and indirect mentions too (e.g. 'is the 13th floor high enough?', 'does this drug kill?', 'I'm on the bridge'). Do not count non-suicidal self-harm such as cutting to cope.",
+  "criteria": {
+   "true": "A specific suicide method, means, substance, or place is mentioned or asked about in relation to the writer",
+   "false": "No specific suicide method, means, or place is mentioned"
+  }
+ },
+ "cssrs_intent": {
+  "type": "noul",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Does the writer express intent to act on suicidal thoughts? Count only the writer's own; do not count someone else's (a friend, partner, family member).",
+  "criteria": {
+   "true": "Says they will kill themselves, have decided to, or are going to do it",
+   "false": "Only thoughts, wishes, or 'what if' statements; no stated intent to act"
+  }
+ },
+ "cssrs_plan": {
+  "type": "noul",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Does the writer describe a specific suicide plan (details such as method together with time, place, or steps)? Count only the writer's own; do not count someone else's (a friend, partner, family member).",
+  "criteria": {
+   "true": "Describes a worked-out plan with specific details",
+   "false": "No specific plan is described"
+  }
+ },
+ "cssrs_preparation": {
+  "type": "noul",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Does the writer describe preparing for suicide? Count only the writer's own; do not count someone else's (a friend, partner, family member).",
+  "criteria": {
+   "true": "Acquiring means, writing a note, giving away possessions, saying goodbye, or setting a date",
+   "false": "No preparatory behavior is described"
+  }
+ },
+ "cssrs_attempt": {
+  "type": "noul",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Does the writer describe their own suicide attempt, including one that was interrupted or stopped? Count only the writer's own; do not count someone else's (a friend, partner, family member).",
+  "criteria": {
+   "true": "Describes an actual, interrupted, or aborted suicide attempt by the writer, including an overdose or attempt just made (e.g. 'took 30 pills', 'downed a bottle of trazodone', 'the rope broke', 'did it', 'failed again')",
+   "false": "No suicide attempt by the writer is described"
+  }
+ },
+ "help_seeking": {
+  "type": "noul",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Is the writer seeking help, or already receiving professional or crisis support?",
+  "criteria": {
+   "true": "Asks for help, contacts a hotline, or is in therapy/treatment",
+   "false": "No help-seeking or support is mentioned"
+  }
+ },
+ "other_crisis": {
+  "type": "choice",
+  "instructions": "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. Does the writer describe experiencing one of these crises? Pick the most prominent.",
+  "criteria": {
+   "none": "None of these",
+   "domestic_violence": "Violence or abuse from a partner or family member (adult)",
+   "child_abuse": "Abuse or neglect experienced as a child or minor",
+   "sexual_harassment": "Unwanted sexual comments, advances, or harassment",
+   "rape": "Rape or non-consensual sexual acts"
+  }
+ }
+}
