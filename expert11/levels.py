@@ -1,7 +1,7 @@
 """expert11: 질문 답으로 급성 수준·만성 표지를 정한다 (전문가 자료 슬라이드 7·8).
 
-점수 질문은 누적 확률 P(≥k) ≥ P_ON(0.5) 이면 그 단계 이상, 예/아니오는 '예' 확률 ≥ 0.7.
-시점은 0(해당 없음)을 뺀 나머지에서 최근 쪽부터 누적 확률 ≥ P_ON 인 구간으로 본다.
+점수 질문은 Jev 점수가 k - 0.5 이상이면 k 단계 이상 (common/rules.py at_least), 예/아니오는 '예' 확률 ≥ 0.7.
+시점은 0(해당 없음) 확률을 뺀 나머지로 다시 낸 평균 점수로 구간을 정한다 (common/rules.py recent).
   시점 단계: 1 12개월보다 전 / 2 3~12개월 (행동·자해는 시점 불명 포함) / 3 1~3개월 / 4 1개월 안 (사고는 시점 불명 포함) / 5 지금
 
   급성 고   자살 의도(약간 이상) + 사고 1개월 안 · 자살 행동(멈춤·저지 포함) 3개월 안 · 준비 행동 3개월 안
@@ -21,22 +21,16 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "common"))
-from rules import CONF, P_ON, YES_PROB, p_ge, pick_level, upgrade  # noqa: E402
-
-
-def recent_at_least(probs, k):
-    """시점 확률에서 0(해당 없음)을 빼고, 단계 k 이상(그만큼 최근)일 확률 ≥ P_ON 인지"""
-    rest = 1 - float((probs or {}).get("0", 0))
-    return rest > 0 and p_ge(probs, k) / rest >= P_ON
+from rules import CONF, YES_PROB, at_least, pick_level, recent, upgrade  # noqa: E402
 
 
 def judge_level(a):
     """a = 모든 판정기 답을 합친 dict. 반환: (급성 수준, 만성 표지 목록, 근거 목록)"""
     hits = defaultdict(list)
     chronic = []
-    on = lambda q, k: p_ge(a.get(f"{q}_probs"), k) >= P_ON  # noqa: E731
+    on = lambda q, k: at_least(a, q, k)  # noqa: E731
     yes = lambda q: (a.get(q) or 0) >= YES_PROB  # noqa: E731
-    t = lambda q, k: recent_at_least(a.get(f"{q}_probs"), k)  # noqa: E731
+    t = lambda q, k: recent(a, q, k, unknown=4 if q == "t_ideation" else 2)  # noqa: E731  시점 불명: 사고 1개월 안, 나머지 3~12개월
 
     # 2·3·5 사고·의도·계획: 1개월 창
     thought = on("suicide_ideation", 1) or on("suicide_intent", 1) or on("suicide_plan", 1)

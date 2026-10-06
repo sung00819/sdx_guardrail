@@ -1,6 +1,6 @@
 """세 설계가 함께 쓰는 기준값과 도우미.
 
-- 점수 질문: 누적 확률 P(≥k) ≥ P_ON 이면 그 단계 이상으로 본다.
+- 점수 질문: Jev 점수가 k - 0.5 이상이면 k 단계 이상으로 본다 (THRESHOLD_MODE = "score"). 누적 확률 방식도 남겨 둠.
 - 예/아니오 질문: '예' 확률 ≥ YES_PROB.
 - 선택형 질문: 고른 값의 신뢰도 ≥ CONF.
 - 대응 수준: 전문가 검수 자료 슬라이드 8 (급성 수준 × 만성 위험 표지).
@@ -40,6 +40,37 @@ def p_ge(probs, k):
 
 def yes(a, q):
     return (a.get(q) or 0) >= YES_PROB
+
+
+# 점수 질문의 단계 판정 방식
+#   "score"   : Jev 점수(단계별 확률의 가중평균)가 k - 0.5 이상이면 k 단계 이상 (반올림 기준). 2026-10-06 사용자 결정
+#   "cumprob" : 누적 확률 P(≥k) ≥ P_ON 이면 k 단계 이상 (이전 방식. CRADLE test 대응 수준 96.7~98.4% 같고,
+#               점수 방식이 애매한 발화를 조금 더 높게 본다: 현재 위기 놓침은 줄고 위기 이전 발화 대응은 늘어남)
+THRESHOLD_MODE = "score"
+
+
+def at_least(a, q, k):
+    """점수 질문 q 의 답이 k 단계 이상인지"""
+    if THRESHOLD_MODE == "score":
+        return (a.get(q) or 0) >= k - 0.5
+    return p_ge(a.get(f"{q}_probs"), k) >= P_ON
+
+
+def recent(a, q, k, unknown):
+    """시점 질문 q 가 k 단계 이상(그만큼 최근)인지. 경험이 있을 때만 부른다.
+    unknown = 시점 불명일 때 볼 단계 (행동·자해 2 = 3~12개월, 사고 4 = 1개월 안: 사용자 결정).
+    점수 방식: 0(해당 없음) 확률을 뺀 나머지로 다시 낸 평균 점수 (0 이 섞여 과거 쪽으로 끌리지 않게).
+      다만 시점 질문이 '해당 없음' 쪽이면(나머지 < 0.5) 남은 작은 확률로 시점을 정하지 않고 시점 불명으로 본다.
+      (예: "Have a good night" 에서 준비 행동 점수 1.07 인데 시점은 98% '해당 없음' → 남은 2% 로 '지금'이 되어 즉시 대응이 됐음)"""
+    probs = a.get(f"{q}_probs") or {}
+    rest = 1 - float(probs.get("0", 0))
+    if THRESHOLD_MODE == "score":
+        if rest < 0.5:
+            return unknown >= k
+        return sum(int(lv) * float(v) for lv, v in probs.items()) / rest >= k - 0.5
+    if rest <= 0:
+        return False
+    return p_ge(probs, k) / rest >= P_ON
 
 
 def pick_level(hits):
