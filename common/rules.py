@@ -16,13 +16,20 @@ P_ON = 0.5
 YES_PROB = 0.7
 CONF = 0.9
 
-LEVELS = ["신호 없음", "급성 저", "급성 중", "급성 고"]
-RESPONSES = ["즉시 대응", "확인과 연계", "지지와 추적", "통상 대응", "제외(타인)"]
+# 출력은 영어 코드로 낸다 (챗봇 등 다른 코드가 받는 값). 사람이 읽는 표·문서에는 LABEL_KO 의 한국어 이름을 쓴다.
+LEVELS = ["none", "low", "moderate", "high"]
+RESPONSES = ["urgent", "assess", "support", "normal", "other"]
+EXCLUDED = "other"
+LABEL_KO = {
+    "none": "신호 없음", "low": "급성 저", "moderate": "급성 중", "high": "급성 고",
+    "urgent": "즉시 대응", "assess": "확인과 연계", "support": "지지와 추적",
+    "normal": "통상 대응", "other": "제외(타인)",
+}
 RESPONSE = {  # (급성 수준, 만성 표지 있음) → 대응 수준
-    ("급성 고", False): "즉시 대응", ("급성 고", True): "즉시 대응",
-    ("급성 중", False): "확인과 연계", ("급성 중", True): "확인과 연계",
-    ("급성 저", False): "지지와 추적", ("급성 저", True): "확인과 연계",
-    ("신호 없음", False): "통상 대응", ("신호 없음", True): "지지와 추적",
+    ("high", False): "urgent", ("high", True): "urgent",
+    ("moderate", False): "assess", ("moderate", True): "assess",
+    ("low", False): "support", ("low", True): "assess",
+    ("none", False): "normal", ("none", True): "support",
 }
 
 
@@ -37,24 +44,24 @@ def yes(a, q):
 
 def pick_level(hits):
     """가장 높은 기준으로 판정한다 (합산하지 않음). hits = {수준: [근거]}"""
-    level = next((lv for lv in reversed(LEVELS) if hits.get(lv)), "신호 없음")
+    level = next((lv for lv in reversed(LEVELS) if hits.get(lv)), "none")
     reasons = [r for lv in reversed(LEVELS) for r in hits.get(lv, [])]
     return level, reasons
 
 
 def upgrade(level, reasons, a):
     """맥락 요인으로 한 단계까지만 상향: 수단 접근(중→고), 급성 위험 맥락(저→중)"""
-    if level == "급성 중" and yes(a, "means_access"):
-        return "급성 고", reasons + ["상향: 수단 접근"]
-    if level == "급성 저" and yes(a, "acute_context"):
-        return "급성 중", reasons + ["상향: 급성 위험 맥락"]
+    if level == "moderate" and yes(a, "means_access"):
+        return "high", reasons + ["escalated_means_access"]
+    if level == "low" and yes(a, "acute_context"):
+        return "moderate", reasons + ["escalated_acute_context"]
     return level, reasons
 
 
 def respond(level, chronic, a):
     """신호가 있는데 다른 사람 이야기(v4i subject=other, 신뢰도 ≥ CONF)면 제외. 아니면 슬라이드 8 대응 수준"""
-    if a.get("subject") == "other" and (a.get("subject_conf") or 0) >= CONF and (level != "신호 없음" or chronic):
-        return "제외(타인)"
+    if a.get("subject") == "other" and (a.get("subject_conf") or 0) >= CONF and (level != "none" or chronic):
+        return EXCLUDED
     return RESPONSE[(level, bool(chronic))]
 
 

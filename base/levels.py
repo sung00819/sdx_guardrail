@@ -31,30 +31,30 @@ def judge_level(a):
 
     def add(level, reason, past):
         if past:
-            chronic.append(f"과거: {reason}")
+            chronic.append(f"past_{reason}")
         else:
             hits[level].append(reason)
 
     if yes(a, "cssrs_intent"):
-        add("급성 고", "자살 의도", si_past)
+        add("high", "suicidal_ideation_active_intent", si_past)
     if yes(a, "cssrs_preparation"):
-        add("급성 고", "준비 행동", si_past)
+        add("high", "preparation", si_past)
     if yes(a, "cssrs_attempt"):
-        add("급성 고", "자살 시도", si_past)
+        add("high", "attempt", si_past)
     if yes(a, "cssrs_plan"):
-        add("급성 고" if yes(a, "cssrs_intent") else "급성 중", "자살 계획", si_past)
+        add("high" if yes(a, "cssrs_intent") else "moderate", "suicidal_ideation_plan", si_past)
     if yes(a, "cssrs_method") and not yes(a, "cssrs_intent"):
-        add("급성 중", "방법 생각", si_past)
+        add("moderate", "suicidal_ideation_method", si_past)
     if p_ge(a.get("suicide_risk_probs"), 2) >= P_ON:
-        add("급성 저", "자살 사고", si_past)
+        add("low", "suicidal_ideation", si_past)
 
     shp = a.get("self_harm_probs")
     if p_ge(shp, 3) >= P_ON:
-        add("급성 중", "자해 행동", sh_past)
+        add("moderate", "self_harm_behavior", sh_past)
     elif p_ge(shp, 2) >= P_ON:
-        add("급성 저", "자해 충동", sh_past)
+        add("low", "self_harm_urge", sh_past)
     if yes(a, "sh_severe"):
-        chronic.append("심한·반복 자해")
+        chronic.append("self_harm_severe")
 
     level, reasons = pick_level(hits)
     return level, chronic, reasons

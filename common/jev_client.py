@@ -29,7 +29,7 @@ def api_key():
     if os.environ.get("OPENROUTER_API_KEY"):
         return os.environ["OPENROUTER_API_KEY"]
     here = os.path.dirname(os.path.abspath(__file__))
-    for path in (os.path.join(here, "..", ".env"),):
+    for path in (os.path.join(here, "..", ".env"), os.path.join(here, "..", "..", ".env")):  # 저장소 맨 위, 그 위
         key = read_dotenv(path).get("OPENROUTER_API_KEY")
         if key:
             return key

@@ -42,47 +42,47 @@ def judge_level(a):
     thought = on("suicide_ideation", 1) or on("suicide_intent", 1) or on("suicide_plan", 1)
     if thought and t("t_ideation", 4):
         if on("suicide_intent", 1):
-            hits["급성 고"].append("자살 의도")
+            hits["high"].append("suicidal_ideation_active_intent")
         elif on("suicide_plan", 2):  # 시기·장소까지 구체화
-            hits["급성 중"].append("계획 있음(의도 없음)")
+            hits["moderate"].append("suicidal_ideation_plan")
         elif on("suicide_ideation", 3) or on("suicide_plan", 1):  # 방법만 = C-SSRS ③
-            hits["급성 중"].append("사고: 방법 생각")
+            hits["moderate"].append("suicidal_ideation_method")
         if on("suicide_ideation", 1) and not on("suicide_ideation", 3):
-            hits["급성 저"].append("사고: 죽고 싶은 소망·비특이적")
+            hits["low"].append("suicidal_ideation_passive")
     elif thought:
-        chronic.append("1개월보다 전의 자살 사고")
+        chronic.append("suicidal_ideation_over_1m")
 
     # 1·4 자살 행동·준비 행동: 3개월(고) / 12개월(중) 창
-    for q, tq, name in (("suicide_behavior", "t_behavior", "자살 행동"), ("preparation", "t_preparation", "준비 행동")):
+    for q, tq, name in (("suicide_behavior", "t_behavior", "suicidal_behavior"), ("preparation", "t_preparation", "preparation")):
         if on(q, 1):
             if t(tq, 3):
-                hits["급성 고"].append(f"{name} 3개월 안")
+                hits["high"].append(f"{name}_within_3m")
             elif t(tq, 2):
-                hits["급성 중"].append(f"{name} 3~12개월·불명")
+                hits["moderate"].append(f"{name}_3_12m_or_unknown")
             else:
-                chronic.append(f"{name} 12개월보다 전")
+                chronic.append(f"{name}_over_12m")
 
     # 6 자해: 12개월 창. 자살 의도가 확인되면 자살 행동으로 본다
     if on("sh_level", 2):
         suicidal = a.get("sh_intent") == "suicidal" and (a.get("sh_intent_conf") or 0) >= CONF
         if suicidal and t("t_self_harm", 3):
-            hits["급성 고"].append("자살 의도 자해 3개월 안")
+            hits["high"].append("self_harm_suicidal_within_3m")
         elif t("t_self_harm", 2):
-            hits["급성 중"].append("자해 12개월 안·불명")
+            hits["moderate"].append("self_harm_within_12m_or_unknown")
         else:
-            chronic.append("자해 12개월보다 전")
+            chronic.append("self_harm_over_12m")
         if on("sh_level", 3):
-            chronic.append("반복·심한 자해")
+            chronic.append("self_harm_severe")
     elif on("sh_level", 1):
-        hits["급성 저"].append("자해 충동")
+        hits["low"].append("self_harm_urge")
 
     # 7~11 맥락
     if yes("cannot_stay_safe"):
-        hits["급성 고"].append("안전 유지 불가")
+        hits["high"].append("unable_to_stay_safe")
     if yes("warning_signs"):
-        hits["급성 저"].append("간접 경고신호")
+        hits["low"].append("indirect_warning")
     if yes("psych_history"):
-        chronic.append("정신과 병력·위험요인")
+        chronic.append("psychiatric_history")
 
     level, reasons = upgrade(*pick_level(hits), a)  # 가장 높은 기준 + 한 단계까지만 상향
     return level, chronic, reasons

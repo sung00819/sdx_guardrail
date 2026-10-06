@@ -1,6 +1,5 @@
-"""expert11: 전문가 검수 자료(2026-10-02)의 11개 위험평가 기준 항목. 질문 30개를 한 번의 Jev 호출로 묻는다.
+"""expert11: 전문가 검수 자료(2026-10-02)의 11개 위험평가 기준 항목. 질문 17개를 한 번의 Jev 호출로 묻는다.
 
-  v4i         자살 이야기 감지 (base 질문 그대로)
   t_behavior  1 자살 행동, 4 준비 행동
   t_thought   2 자살 의도, 3 자살 계획, 5 자살 사고
   t_selfharm  6 자해 (정도 + 자살 의도)
@@ -13,17 +12,13 @@
 
 질문을 바꾸면 VERSION 을 올린다.
 버전 기록: t11a 첫 정의 → t11b 의도 1단계는 실행 언급이 있을 때만, 급성 맥락은 구체적 사건·상태만 → t11c 같은 질문을 한 번에 묻기
+          → t11only base(v4i) 질문 13개를 뺌 (2026-10-06, 사용자 결정). 수준 계산에 v4i 답을 쓰지 않아서
+            CRADLE test 대응 수준 98.4% 일치(재실행 흔들림 수준), 남 이야기 10개 동일, 비용 약 30% 감소.
+            v4i 가 없으니 주체 판정에 따른 '제외(타인)'와 기존 발동 규칙 결과(v4i_decision)는 나오지 않는다.
+            남 이야기는 질문마다 붙은 '본인 경험만 센다' 지시로 거른다.
 """
 
-import os
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "common"))
-from rules import load_design  # noqa: E402
-
-V4I = load_design("base", "questions").QUESTIONS
-
-VERSION = "t11c"
+VERSION = "t11only"
 
 PRE = "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. "
 OWN = "Count only the writer's own experience; do not count someone else's (a friend, partner, family member), fiction, or news. "
@@ -196,10 +191,10 @@ T_TIME = {
                         TIME_BEHAVIOR),
 }
 
-PARTS = {"v4i": V4I, "t_behavior": T_BEHAVIOR, "t_thought": T_THOUGHT, "t_selfharm": T_SELFHARM,
+PARTS = {"t_behavior": T_BEHAVIOR, "t_thought": T_THOUGHT, "t_selfharm": T_SELFHARM,
          "t_context": T_CONTEXT, "t_time": T_TIME}
 
-# 여섯 부분을 한 번의 Jev 호출로 묻는다 (CRADLE test 100개에서 나눠 물은 결과와 대응 수준 99/100 일치)
+# 다섯 부분을 한 번의 Jev 호출로 묻는다 (나눠 물은 결과와 CRADLE test 100개에서 대응 수준 99/100 일치)
 ALL = {}
 for _qs in PARTS.values():
     for _q, _spec in _qs.items():

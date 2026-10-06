@@ -12,7 +12,30 @@ import json
 import os
 from collections import defaultdict
 
-from rules import ROOT, load_design, respond
+from rules import EXCLUDED, ROOT, load_design, respond, yes
+
+# 출력 필드 (사용자 결정 2026-10-05: 측정값과 규칙 결과를 나눈다)
+#   reasons     측정: 수준을 정한 임상 신호. 상향 코드(escalated_*)는 빼서 upgraded_by 로 옮긴다
+#   context     측정: Jev 가 '예'라고 한 맥락 요인. 상향 여부와 상관없이 항상 넣는다 (상향 때만 남기면 수단 정보가 85~97% 빠졌다)
+#   upgraded_by 규칙: 맥락 요인으로 한 단계 올렸으면 그 요인, 아니면 null
+CONTEXT_QUESTIONS = ("means_access", "acute_context")
+UPGRADE_CODE = {"escalated_means_access": "means_access", "escalated_acute_context": "acute_context"}
+
+# base/guard_rule.py decide_final 의 판정 이름 → 영어 코드
+V4I_DECISION = {"발동": "alert", "과거(병렬 전달)": "past_info_only", "제외(타인)": "other_person", "미발동": "no_alert"}
+
+
+def codes(a, levels):
+    """발화 하나의 Jev 답(flatten) → 출력 코드. 챗봇 시뮬레이션(chatbot/sim/guardrail.py)도 이 함수를 쓴다."""
+    level, chronic, reasons = levels.judge_level(a)
+    response = respond(level, chronic, a)
+    upgraded_by = next((UPGRADE_CODE[c] for c in reasons if c in UPGRADE_CODE), None)
+    reasons = [c for c in reasons if c not in UPGRADE_CODE]
+    context = [q for q in CONTEXT_QUESTIONS if yes(a, q)]
+    if response == EXCLUDED:  # 다른 사람 이야기: 사용자 본인의 신호·맥락이 아니다
+        level, chronic, reasons, context, upgraded_by = EXCLUDED, [], ["other_person"], [], None
+    return {"level": level, "response": response, "reasons": reasons, "context": context,
+            "upgraded_by": upgraded_by, "chronic": chronic}
 
 
 def combine(rows, design):
@@ -23,12 +46,10 @@ def combine(rows, design):
         by_key[r["key"]].update({k: v for k, v in r.items() if k not in ("judge", "raw")})
     out = []
     for key, a in by_key.items():
-        level, chronic, reasons = levels.judge_level(a)
-        response = respond(level, chronic, a)
-        if response == "제외(타인)":
-            level, chronic, reasons = "제외(타인)", [], ["다른 사람 이야기"]
-        out.append({"key": key, "gold": a.get("gold"), "current": a.get("current"), "level": level, "chronic": chronic,
-                    "response": response, "reasons": reasons, "v4i_decision": guard.decide_final(a)[0]})
+        # v4i 질문이 있는 설계(base, base-eval)만 기존 발동 규칙 결과를 낸다. expert11 은 v4i 를 묻지 않아 null
+        v4i = V4I_DECISION[guard.decide_final(a)[0]] if "suicide_risk" in a else None
+        out.append({"key": key, "gold": a.get("gold"), "current": a.get("current"), **codes(a, levels),
+                    "v4i_decision": v4i})
     return out
 
 

@@ -23,16 +23,16 @@ from rules import CONF, P_ON, YES_PROB, p_ge, pick_level, upgrade  # noqa: E402
 
 
 def time_bin(probs):
-    """시점 점수 확률 → '진행·3개월' / '3~12개월·불명' / '12개월 전' / None(경험 없음).
+    """시점 점수 확률 → within_3m(진행·3개월) / 3_12m_or_unknown(3~12개월·불명) / over_12m(12개월 전) / None(경험 없음).
     0단계(없음)를 뺀 나머지를 다시 나눈 뒤 최근 쪽부터 누적 확률 ≥ P_ON 이면 그 구간."""
     rest = 1 - float((probs or {}).get("0", 0))
     if rest <= 0:
         return None
     if p_ge(probs, 3) / rest >= P_ON:
-        return "3개월 이내"
+        return "within_3m"
     if p_ge(probs, 2) / rest >= P_ON:
-        return "3~12개월·불명"
-    return "12개월 전"
+        return "3_12m_or_unknown"
+    return "over_12m"
 
 
 def judge_level(a):
@@ -45,56 +45,56 @@ def judge_level(a):
     # 자살 사고 (C-SSRS ①~⑤, 최근 1개월)
     st = j1.get("si_ideation_stage_probs")
     if p_ge(st, 4) >= P_ON or yes("cssrs_intent"):
-        hits["급성 고"].append("사고: 실행 의도")
+        hits["high"].append("suicidal_ideation_active_intent")
     elif p_ge(st, 3) >= P_ON:
-        hits["급성 중"].append("사고: 방법 생각(의도 없음)")
+        hits["moderate"].append("suicidal_ideation_method")
     elif p_ge(st, 1) >= P_ON:
-        hits["급성 저"].append("사고: 죽고 싶은 소망·비특이적 사고")
+        hits["low"].append("suicidal_ideation_passive")
     if yes("cssrs_plan") and not yes("cssrs_intent"):
-        hits["급성 중"].append("계획 있음(의도 없음)")
+        hits["moderate"].append("suicidal_ideation_plan")
     if yes("cannot_stay_safe"):
-        hits["급성 고"].append("안전 유지 불가")
+        hits["high"].append("unable_to_stay_safe")
     if yes("warning_signs"):
-        hits["급성 저"].append("간접 경고신호")
+        hits["low"].append("indirect_warning")
     if yes("denial"):
-        hits["급성 저"].append("부인 진술")  # 부인으로 낮추지 않는다: 다른 기준이 더 높으면 그 수준이 남는다
+        hits["low"].append("denies_risk")  # 부인으로 낮추지 않는다: 다른 기준이 더 높으면 그 수준이 남는다
 
     # 자살 행동 (j2)
     if p_ge(j2.get("sb_level_probs"), 1) >= P_ON:
         t = time_bin(j2.get("sb_time_probs"))
-        if t == "3개월 이내":
-            hits["급성 고"].append("자살 행동 3개월 이내")
-        elif t == "12개월 전":
-            chronic.append("자살 행동 12개월 전")
+        if t == "within_3m":
+            hits["high"].append("suicidal_behavior_within_3m")
+        elif t == "over_12m":
+            chronic.append("suicidal_behavior_over_12m")
         else:  # 3~12개월, 시점 불명, 또는 시점 확률이 없음
-            hits["급성 중"].append("자살 행동 3~12개월·불명")
+            hits["moderate"].append("suicidal_behavior_3_12m_or_unknown")
 
     # 자해 (j3)
     shp = j3.get("sh_level_probs")
     if p_ge(shp, 2) >= P_ON:  # 행동
         t = time_bin(j3.get("sh_time_probs"))
         suicidal = j3.get("sh_suicidal_intent") == "suicidal" and (j3.get("sh_suicidal_intent_conf") or 0) >= CONF
-        if t == "12개월 전":
-            chronic.append("자해 12개월 전")
-        elif suicidal and t == "3개월 이내":
-            hits["급성 고"].append("자살 의도 자해 3개월 이내")
+        if t == "over_12m":
+            chronic.append("self_harm_over_12m")
+        elif suicidal and t == "within_3m":
+            hits["high"].append("self_harm_suicidal_within_3m")
         else:
-            hits["급성 중"].append("자해 12개월 이내·불명")
+            hits["moderate"].append("self_harm_within_12m_or_unknown")
         if p_ge(shp, 3) >= P_ON:
-            chronic.append("반복·심한 자해")
+            chronic.append("self_harm_severe")
     elif p_ge(shp, 1) >= P_ON:
-        hits["급성 저"].append("자해 충동")
+        hits["low"].append("self_harm_urge")
     else:  # j3 가 자해를 못 봤을 때 j1(v4i) 자해 점수로 보완. 확인되지 않은 쪽으로 낮추지 않는다
         j1sh = j1.get("self_harm_probs")
         if p_ge(j1sh, 3) >= P_ON:
-            hits["급성 중"].append("자해 행동(j1 보완)")
+            hits["moderate"].append("self_harm_behavior_fallback")
         elif p_ge(j1sh, 2) >= P_ON:
-            hits["급성 저"].append("자해 충동(j1 보완)")
+            hits["low"].append("self_harm_urge_fallback")
 
     if yes("si_chronic"):
-        chronic.append("만성적 자살 사고")
+        chronic.append("suicidal_ideation_chronic")
     if yes("psych_history"):
-        chronic.append("정신과 병력")
+        chronic.append("psychiatric_history")
 
     level, reasons = upgrade(*pick_level(hits), a)  # 가장 높은 기준 + 한 단계까지만 상향
     return level, chronic, reasons

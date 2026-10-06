@@ -12,7 +12,7 @@ from collections import Counter, defaultdict
 
 from rules import DESIGNS, RESPONSES, ROOT
 
-SHORT = ["즉시", "확인", "지지", "통상", "제외"]
+SHORT = {"urgent": "즉시", "assess": "확인", "support": "지지", "normal": "통상", "other": "제외"}
 GROUPS = ["능동적 자살 사고 (현재)", "수동적 자살 사고 (현재)", "자해 (현재)", "자살·자해 (과거)", "경고 신호 (alert)",
           "기타 위기 (폭력·학대 등)", "위기 이전 발화", "위기 이후 발화 (라벨 없음)"]
 
@@ -67,7 +67,7 @@ def main():
     if cradle:
         for R in designs.values():
             cradle_group(R)
-    L = [f"# 설계 비교 · {args.source}", "", f"칸 = {' / '.join(SHORT)} (대응 수준별 개수)", "",
+    L = [f"# 설계 비교 · {args.source}", "", f"칸 = {' / '.join(SHORT[k] for k in RESPONSES)} (대응 수준별 개수)", "",
          f"| {'정답 라벨 그룹' if cradle else '데이터'} | 전체 | " + " | ".join(designs) + " |",
          "|---|---|" + "---|" * len(designs)]
     rows_of = [(g, lambda r, g=g: r["group"] == g) for g in GROUPS] if cradle else []
