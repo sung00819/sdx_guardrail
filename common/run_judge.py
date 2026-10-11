@@ -1,9 +1,11 @@
 """설계 하나의 질문으로 데이터의 사용자 발화를 Jev 채점한다. 발화 하나 = Jev 호출 한 번.
 
 사용법 (저장소 맨 위에서):
-    python3 common/run_judge.py --design base-eval --source cradle_test --dry-run
-    python3 common/run_judge.py --design base-eval --source cradle_test      # → out/el3c_cradle_test.jsonl
+    python3 common/run_judge.py --design expert11 --source cradle_test --dry-run
+    python3 common/run_judge.py --design expert11 --source cradle_test       # → out/t11e_cradle_test.jsonl
     python3 common/run_judge.py --design expert11 --source attunebench
+    python3 common/run_judge.py --design expert11 --source cradle_test --judge kev   # → out/judges/kev_t11e_cradle_test.jsonl
+    python3 common/run_judge.py ... --judge kev --tag kev9b_ft1   # 학습한 Kev → out/judges/kev9b_ft1_t11e_cradle_test.jsonl
 
 출력: 한 줄 = 발화 하나. {key, judge, source, gold, <질문 답>, current, raw}
       옆에 <출력>.questions.json 으로 그때 쓴 질문을 남기고, 다른 질문으로 같은 파일에 이어 쓰면 막는다 (결과 덮어쓰기 방지).
@@ -17,7 +19,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import data
-from jev_client import MODEL, call_jev, flatten, make_session
+from jev_client import JUDGE_MODELS, call_jev, flatten, make_session
 from rules import DESIGNS, ROOT, load_design
 
 
@@ -29,10 +31,14 @@ def main():
     ap.add_argument("--sample", type=int)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--keys", help="이 파일에 적힌 key(한 줄에 하나)만 채점. --output 과 함께 쓴다")
+    ap.add_argument("--judge", default="jev", choices=sorted(JUDGE_MODELS), help="jev(OpenRouter) / kev / clm (54번 서버)")
+    ap.add_argument("--tag", help="출력 파일 이름 앞에 붙일 이름 (기본: --judge, kev 는 확정 판정기 kev4b_ft2). "
+                                  "out/judges/kev_* 는 학습 전 공개 Kev-9B 기준선이라 다른 이름으로 둔다")
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--output")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
+    args.tag = args.tag or {"kev": "kev4b_ft2"}.get(args.judge)
 
     q = load_design(args.design, "questions")
     judges, version = q.JUDGES, q.VERSION
@@ -42,8 +48,10 @@ def main():
         rows = [r for r in rows if r["key"] in keep]
         if not args.output:
             sys.exit("--keys 를 쓸 때는 --output 을 주세요")
-    out_path = args.output or os.path.join(ROOT, "out", f"{version}_{args.source}"
-                                                         f"{f'_s{args.sample}' if args.sample else ''}.jsonl")
+    name = f"{version}_{args.source}{f'_s{args.sample}' if args.sample else ''}.jsonl"
+    # Jev 결과는 예전 자리, 다른 판정기는 out/judges/ 에 이름 앞에 판정기를 붙여 따로 둔다 (결과를 섞지 않는다)
+    out_path = args.output or (os.path.join(ROOT, "out", name) if args.judge == "jev"
+                               else os.path.join(ROOT, "out", "judges", f"{args.tag or args.judge}_{name}"))
 
     jobs = [(r, n) for r in rows for n in judges]
     if args.dry_run:
@@ -53,7 +61,7 @@ def main():
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     spec_path = out_path + ".questions.json"
-    spec = {"version": version, "model": MODEL, "judges": judges}
+    spec = {"version": version, "model": args.tag or JUDGE_MODELS[args.judge][1], "judges": judges}
     if os.path.exists(spec_path):
         with open(spec_path) as f:
             if json.load(f) != spec:
@@ -69,7 +77,7 @@ def main():
     todo = [(r, n) for r, n in jobs if (r["key"], n) not in done]
     print(f"호출 {len(jobs)}, 완료 {len(done)}, 남음 {len(todo)} → {out_path}")
 
-    session = make_session(args.workers)
+    session = make_session(args.workers, args.judge)
     cost = 0.0
     with open(out_path, "a") as out, ThreadPoolExecutor(args.workers) as pool:
         futures = {pool.submit(call_jev, session, {"context": r["context"], "current": r["current"]}, judges[n]): (r, n)
