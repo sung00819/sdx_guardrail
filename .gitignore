@@ -1,6 +1,9 @@
 .env
 out/
-data/cradle/
-data/guardrail-dataset/
+data/cradle
+data/guardrail-dataset
 __pycache__/
 .DS_Store
+data/aegis2/
+data/Suicidal_Reddit.csv
+data/reddit_cssrs/

@@ -4,6 +4,7 @@
 시점은 0(해당 없음) 확률을 뺀 나머지로 다시 낸 평균 점수로 구간을 정한다 (common/rules.py recent).
   시점 단계: 1 12개월보다 전 / 2 3~12개월 (행동·자해는 시점 불명 포함) / 3 1~3개월 / 4 1개월 안 (사고는 시점 불명 포함) / 5 지금
 
+  (의도·계획·준비는 자살 사고나 자살 행동이 함께 있을 때만 인정)
   급성 고   자살 의도(약간 이상) + 사고 1개월 안 · 자살 행동(멈춤·저지 포함) 3개월 안 · 준비 행동 3개월 안
             · 자살 의도 있는 자해 3개월 안 · 안전 유지 불가 표명
   급성 중   방법을 생각하는 사고(의도 없음) 1개월 안 · 계획 있음(의도 없음) 1개월 안
@@ -31,6 +32,13 @@ def judge_level(a):
     on = lambda q, k: at_least(a, q, k)  # noqa: E731
     yes = lambda q: (a.get(q) or 0) >= YES_PROB  # noqa: E731
     t = lambda q, k: recent(a, q, k, unknown=4 if q == "t_ideation" else 2)  # noqa: E731  시점 불명: 사고 1개월 안, 나머지 3~12개월
+
+    # 의도·계획·준비는 자살 사고나 자살 행동이 함께 잡혔을 때만 인정한다 (2026-10-07).
+    # 앞 대화 없는 한 문장("I will do it tonight", "폭발물을 사고 싶어")에서 무엇을 하겠다는 건지 모르는 채로
+    # 자살 의도·준비가 되는 것을 막는다. 자살 사고 없이 의도·준비만 있는 경우는 실제로 드물다.
+    suicidal = on("suicide_ideation", 1) or on("suicide_behavior", 1)
+    _on = on
+    on = lambda q, k: _on(q, k) and (suicidal or q not in ("suicide_intent", "suicide_plan", "preparation"))  # noqa: E731
 
     # 2·3·5 사고·의도·계획: 1개월 창
     thought = on("suicide_ideation", 1) or on("suicide_intent", 1) or on("suicide_plan", 1)

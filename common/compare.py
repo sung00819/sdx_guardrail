@@ -68,9 +68,16 @@ def main():
         for R in designs.values():
             cradle_group(R)
     L = [f"# 설계 비교 · {args.source}", "", f"칸 = {' / '.join(SHORT[k] for k in RESPONSES)} (대응 수준별 개수)", "",
-         f"| {'정답 라벨 그룹' if cradle else '데이터'} | 전체 | " + " | ".join(designs) + " |",
+         f"| {'정답 라벨 그룹' if cradle else '원래 라벨' if args.source in ('kaggle', 'aegis2', 'reddit_cssrs') else '데이터'} | 전체 | " + " | ".join(designs) + " |",
          "|---|---|" + "---|" * len(designs)]
     rows_of = [(g, lambda r, g=g: r["group"] == g) for g in GROUPS] if cradle else []
+    if args.source == "kaggle":  # 서브레딧 기준 라벨
+        rows_of = [(g, lambda r, g=g: r["gold"]["orig_label"] == g) for g in ("Suicidal", "Non-Suicidal")]
+    if args.source == "reddit_cssrs":  # 임상가 C-SSRS 라벨
+        rows_of = [(g, lambda r, g=g: r["gold"]["label"] == g)
+                   for g in ("attempt", "behavior", "ideation", "indicator", "supportive", "uninformative")]
+    if args.source == "aegis2":  # Suicide and Self Harm 카테고리 여부
+        rows_of = [(g, lambda r, v=v: r["gold"]["self_harm"] == v) for g, v in (("자살·자해", True), ("그 외", False))]
     for g, keep in rows_of + [("**전체**", lambda r: True)]:
         parts = [[r for r in R if keep(r)] for R in designs.values()]
         L.append(f"| {g} | {len(parts[0])} | " + " | ".join(cell(p) for p in parts) + " |")

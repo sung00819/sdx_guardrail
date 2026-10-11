@@ -1,10 +1,7 @@
 """Jev 채점 결과에 설계별 판정 규칙(<설계>/levels.py)을 적용해 발화마다 급성 수준·만성 표지·대응 수준을 정한다.
-세 설계 모두 v4i 질문을 포함하므로, 어제 최종 발동 규칙(base/guard_rule.py decide_final)의 결과도 함께 남긴다.
 
 사용법:
-    python3 common/combine.py --design base-eval --source cradle_test   # → out/combined_base-eval_cradle_test.jsonl
-    python3 common/combine.py --design base --source cradle_test --input out/el3c_cradle_test.jsonl
-        (base 질문은 base-eval·expert11 질문 안에 그대로 있어서, 그 결과로 base 를 계산할 수 있다)
+    python3 common/combine.py --design expert11 --source cradle_test   # → out/combined_expert11_cradle_test.jsonl
 """
 
 import argparse
@@ -20,9 +17,6 @@ from rules import EXCLUDED, ROOT, load_design, respond, yes
 #   upgraded_by 규칙: 맥락 요인으로 한 단계 올렸으면 그 요인, 아니면 null
 CONTEXT_QUESTIONS = ("means_access", "acute_context")
 UPGRADE_CODE = {"escalated_means_access": "means_access", "escalated_acute_context": "acute_context"}
-
-# base/guard_rule.py decide_final 의 판정 이름 → 영어 코드
-V4I_DECISION = {"발동": "alert", "과거(병렬 전달)": "past_info_only", "제외(타인)": "other_person", "미발동": "no_alert"}
 
 
 def codes(a, levels):
@@ -40,16 +34,12 @@ def codes(a, levels):
 
 def combine(rows, design):
     levels = load_design(design, "levels")
-    guard = load_design("base", "guard_rule")
     by_key = defaultdict(dict)
     for r in rows:
         by_key[r["key"]].update({k: v for k, v in r.items() if k not in ("judge", "raw")})
     out = []
     for key, a in by_key.items():
-        # v4i 질문이 있는 설계(base, base-eval)만 기존 발동 규칙 결과를 낸다. expert11 은 v4i 를 묻지 않아 null
-        v4i = V4I_DECISION[guard.decide_final(a)[0]] if "suicide_risk" in a else None
-        out.append({"key": key, "gold": a.get("gold"), "current": a.get("current"), **codes(a, levels),
-                    "v4i_decision": v4i})
+        out.append({"key": key, "gold": a.get("gold"), "current": a.get("current"), **codes(a, levels)})
     return out
 
 

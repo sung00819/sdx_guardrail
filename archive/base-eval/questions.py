@@ -11,6 +11,7 @@
 질문을 바꾸면 VERSION 을 올린다. 결과 파일 이름에 VERSION 이 들어가 이전 결과를 덮지 않는다.
 버전 기록: el1 첫 정의 → el2 자해와 자살 구분, 시점 = 가장 최근 일, 부인·만성 사고 추가 → el3 자해 간접 표현 예시, 병력 좁힘
           → el3c 같은 질문을 한 번에 묻기
+          → el4c 자살 사고·행동·안전 유지 불가·만성 사고·수단 질문에 '자기 자신을 해치는 것만' 조건 (SELF)
 """
 
 import os
@@ -21,8 +22,13 @@ from rules import load_design  # noqa: E402
 
 V4I = load_design("base", "questions").QUESTIONS
 
-VERSION = "el3c"
+VERSION = "el4c"
 
+# 자기 자신을 해치는 것만 센다 (2026-10-07: Aegis 2.0 에서 "시체 처리", "폭발물 구입", "주사로 맞을 건데" 같은
+# 남을 해치는·범죄 질문을 자살 사고·의도·준비로 본 오탐이 많았음)
+SELF = ("Count only thoughts or acts about killing or harming the writer themselves. Do not count harming or killing "
+        "other people or animals, crimes, damaging things, or asking about weapons, drugs, or poisons without saying "
+        "they are for the writer's own death. ")
 PRE = "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. "
 OWN = "Count only the writer's own experience; do not count someone else's (a friend, partner, family member), fiction, or news. "
 
@@ -171,6 +177,11 @@ J3 = {
         },
     },
 }
+
+for _q in ("si_ideation_stage", "means_access", "cannot_stay_safe", "si_chronic"):
+    J1[_q] = {**J1[_q], "instructions": J1[_q]["instructions"] + SELF}
+for _q in ("sb_level", "sb_time"):
+    J2[_q] = {**J2[_q], "instructions": J2[_q]["instructions"] + SELF}
 
 PARTS = {"j1_axes": J1, "j2_suicide_beh": J2, "j3_self_harm": J3}
 

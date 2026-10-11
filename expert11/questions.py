@@ -16,10 +16,18 @@
             CRADLE test 대응 수준 98.4% 일치(재실행 흔들림 수준), 남 이야기 10개 동일, 비용 약 30% 감소.
             v4i 가 없으니 주체 판정에 따른 '제외(타인)'와 기존 발동 규칙 결과(v4i_decision)는 나오지 않는다.
             남 이야기는 질문마다 붙은 '본인 경험만 센다' 지시로 거른다.
+          → t11e (2026-10-07) 자살 행동·의도·계획·준비·사고·수단 질문에 '자기 자신을 해치는 것만' 조건 (SELF),
+            정신과 병력을 base-eval 처럼 좁힘 (입원·장기 중증 질환·물질사용장애. 지금 우울·약·상담은 제외).
+            Aegis 2.0 에서 남을 해치는·범죄 질문을 자살 의도·준비로 본 오탐, CRADLE·Kaggle 에서 병력만으로 붙은 오탐 때문.
 """
 
-VERSION = "t11only"
+VERSION = "t11e"
 
+# 자기 자신을 해치는 것만 센다 (2026-10-07: Aegis 2.0 에서 "시체 처리", "폭발물 구입", "주사로 맞을 건데" 같은
+# 남을 해치는·범죄 질문을 자살 사고·의도·준비로 본 오탐이 많았음)
+SELF = ("Count only thoughts or acts about killing or harming the writer themselves. Do not count harming or killing "
+        "other people or animals, crimes, damaging things, or asking about weapons, drugs, or poisons without saying "
+        "they are for the writer's own death. ")
 PRE = "Judge the 'current' text. Use 'context' (earlier text by the same writer) only to interpret it. "
 OWN = "Count only the writer's own experience; do not count someone else's (a friend, partner, family member), fiction, or news. "
 ANYTIME = "Rate the most severe level described, whether past or present; timing is asked separately. "
@@ -136,10 +144,12 @@ T_CONTEXT = {
         "None of these. Feeling sad, tired, hopeless, trapped, or lonely without a named event does not count "
         "(those are warning signs, asked separately)"),
     "psych_history": noul(
-        "Does the writer mention psychiatric history or other suicide risk factors of their own?",
-        "Current or past mental illness or its treatment (including therapy, medication, or hospitalization), "
-        "a chronic physical illness, or the suicide of someone close to them",
-        "None of these is mentioned"),
+        "Does the writer mention a psychiatric history risk factor of their own?",
+        "Past psychiatric hospitalization or inpatient stay, a long-standing serious mental illness (e.g. bipolar disorder, "
+        "schizophrenia, psychosis, borderline personality disorder, depression lasting for years), a substance use "
+        "disorder (addiction, rehab, long-term heavy use), or the suicide of someone close to them",
+        "None of these. Feeling depressed now, taking an antidepressant, seeing a therapist, or drinking to cope with a "
+        "recent event do not count by themselves"),
     "warning_signs": noul(
         "Does the writer show indirect warning signs of near-term suicide risk, whether or not they mention suicide?",
         "Hopelessness, feeling trapped, feeling a burden, loss of purpose or no reason to live, social withdrawal, "
@@ -190,6 +200,13 @@ T_TIME = {
     "t_self_harm": when("self-harm (the most recent act; if there was never an act, the most recent urges)",
                         TIME_BEHAVIOR),
 }
+
+for _part, _qs in (("t_behavior", ("suicide_behavior", "preparation")),
+                   ("t_thought", ("suicide_intent", "suicide_plan", "suicide_ideation"))):
+    for _q in _qs:
+        _d = {"t_behavior": T_BEHAVIOR, "t_thought": T_THOUGHT}[_part]
+        _d[_q] = {**_d[_q], "instructions": _d[_q]["instructions"] + SELF}
+T_CONTEXT["means_access"] = {**T_CONTEXT["means_access"], "instructions": T_CONTEXT["means_access"]["instructions"] + SELF}
 
 PARTS = {"t_behavior": T_BEHAVIOR, "t_thought": T_THOUGHT, "t_selfharm": T_SELFHARM,
          "t_context": T_CONTEXT, "t_time": T_TIME}

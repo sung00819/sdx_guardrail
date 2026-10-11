@@ -1,4 +1,4 @@
-"""세 설계가 함께 쓰는 기준값과 도우미.
+"""expert11 이 쓰는 기준값과 도우미. (base·base-eval 은 2026-10-07 에 archive/ 로 옮김)
 
 - 점수 질문: Jev 점수가 k - 0.5 이상이면 k 단계 이상으로 본다 (THRESHOLD_MODE = "score"). 누적 확률 방식도 남겨 둠.
 - 예/아니오 질문: '예' 확률 ≥ YES_PROB.
@@ -10,7 +10,17 @@ import importlib.util
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DESIGNS = ("base", "base-eval", "expert11")
+DESIGNS = ("expert11",)
+
+# expert11(t11e) 평가 데이터 구분 (2026-10-07). 질문·규칙을 고칠 때 결과를 보고 쓴 데이터는 개발용이라 일반화 성능으로 보지 않는다.
+#   dev      개발용: 오답을 보고 질문·규칙을 고쳤다
+#   id_hold  ID 보류: 같은 종류(대화) 데이터, 결과는 봤지만 이걸 보고 고치지는 않았다
+#   ood      OOD: 개발에 쓰지 않은 다른 종류 데이터 (Aegis 2.0 은 OOD 로 넣었지만 t11e 수정에 써서 dev 로 옮김)
+SPLIT = {
+    "dev": ["cradle_test", "aegis2", "kaggle", "other_check"],
+    "id_hold": ["cradle_validation", "attunebench", "empathetic_dialogues", "esconv", "sim_vail_turn_scores"],
+    "ood": ["reddit_cssrs"],
+}
 
 P_ON = 0.5
 YES_PROB = 0.7
@@ -97,7 +107,7 @@ def respond(level, chronic, a):
 
 
 def load_design(name, module):
-    """설계 폴더(base, base-eval, expert11)의 파일을 모듈로 불러온다. 폴더 이름에 '-'가 있어 import 문을 쓸 수 없다."""
+    """설계 폴더(expert11)의 파일을 모듈로 불러온다. 폴더 이름에 '-'가 있어 import 문을 쓸 수 없다."""
     if name not in DESIGNS:
         raise SystemExit(f"없는 설계: {name}. 가능한 것: {DESIGNS}")
     path = os.path.join(ROOT, name, f"{module}.py")
