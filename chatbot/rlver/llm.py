@@ -12,7 +12,7 @@ import time
 import requests
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, os.path.join(ROOT, "common"))
+sys.path.append(os.path.join(ROOT, "common"))
 from jev_client import read_dotenv  # noqa: E402
 
 

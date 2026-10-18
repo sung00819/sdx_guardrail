@@ -12,25 +12,30 @@
 | 보상 r = max(e_T, 0) / 100, think 템플릿 형식 위반이면 0 | 숨겨진 욕구 8개 대신 4개: 내 잘못이 아니라고 동의 · 위로 말고 깊은 공감 · 쏟아내는 걸 들어주기 · 실질적 조언 |
 | 챗봇 템플릿 think-then-say / nothink (+ SAGE 평가용 `sage`) | |
 
-## 프로필: 기존 배경 재사용 ([convert_scenes.py](convert_scenes.py))
+## 사용자 = 배경 (고정) + 조합 (나중에)
 
-`out/scenes_{train,test}.jsonl` (../gen_scene.py 결과, 600 · 150개) 에서:
-- **그대로**: 페르소나, 사건 배경, 핵심 고통, 숨긴 위험 사실(있으면 overt), 감정별 말투, 직접 물을 때의 반응, 첫 메시지 (`first_talk`), Big Five·대화 노력·C·D 시드
-- **다시**: 숨겨진 욕구 (같은 뜻은 유지 — be_heard→들어주기, feelings_validated→깊은 공감, practical_help→조언, not_be_judged→내 잘못 아님 — 나머지로 4개 균등), 인물별 감정 규칙 `emotion_rises_when`/`falls_when` (이전 욕구에 맞춰 썼으므로, LLM 한 번)
-- **뺌**: O 셀 (다른 사람 이야기). 모든 인물은 우울한 사용자로 그린다
-- 출력 `out/rlver/profiles_{split}.jsonl`: `persona`·`background` 는 SAGE 형식 글, 시드 값은 따로 필드로
+**배경** ([backgrounds.py](backgrounds.py)): `backgrounds_750.csv` → `out/rlver/backgrounds.csv` (675개, O 셀 제외)
+- 남기는 열: split, id, name, age, gender, occupation, city, topic, core_concern, risk_fact, background, disclosure, slot
+- disclosure (D, 고정): risk_fact 가 있으면 `overt` 매우 위험 (학습 258 · 평가 64), 없으면 `subtle` 은은하게 위험 (282 · 71)
+- 지운 열: cell, true_codes, means, stance, reveal_level, effort, hidden_need, opening_message (첫 발화는 시뮬레이터가 연다)
+- `--clean`: core_concern·background 에 남은 이전 설정 문장 (공개 문턱, 이전 욕구, 태도) 을 LLM 으로 지운다. 해당 행 학습 388 · 평가 102 (`needs_clean`)
+
+**조합** ([compose.py](compose.py), `run.py --combo k`): 배경 id 와 k 로 고정 시드
+- 숨겨진 욕구 4개: (slot + k) mod 4 → split·D 안에서 균등, k = 0~3 이면 배경마다 4개 모두
+- C 태도 (비율 ../build_profile.py), Big Five (나이·성별 + 우울 이동 overt 0.8 · subtle 0.6 + 태도 보정, N ≥ 60 이면 하위 특성), 대화 노력 (Big Five·태도에서)
+- 조합마다 LLM 한 번: 습관·취미·말투·감정별 말투·직접 물을 때 반응·인물별 감정 규칙 → `out/rlver/combos.jsonl` 캐시 (배경을 다시 정리하면 지우고 다시)
 
 ```bash
-python chatbot/rlver/convert_scenes.py --split test --limit 5   # 시험
-python chatbot/rlver/convert_scenes.py                          # train, test
+python chatbot/rlver/backgrounds.py --csv backgrounds_750.csv --clean
+python chatbot/rlver/run.py --split test --combo 0 --n 8 --out out/rlver/peek
 ```
-RLVER 원래 프로필(중국어 500 · 100, 욕구 8개)로 돌리려면 [profiles.py](profiles.py) (영어로 번역).
+RLVER 원래 프로필(중국어 500 · 100, 욕구 8개)로 돌리려면 [profiles.py](profiles.py) 로 번역한 뒤 `run.py --profiles`.
 
 ## 대화 · 평가 ([run.py](run.py))
 
 ```bash
 python chatbot/rlver/run.py --split test --chatbot qwen2.5-7b --template think --out out/rlver/eval_base_think
-python chatbot/rlver/run.py --summary out/rlver/eval_base_think   # Score · Success · Failure · overt/subtle · 욕구별 Score
+python chatbot/rlver/run.py --summary out/rlver/eval_base_think   # Score · Success · Failure · D·욕구·태도별 Score
 ```
 서버 없이: `--config chatbot/rlver/config_openrouter.json` (시뮬레이터 DeepSeek-V3, 논문과 같음; `.env` 에 `OPENROUTER_API_KEY`).
 

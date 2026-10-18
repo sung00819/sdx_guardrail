@@ -3,6 +3,8 @@
     python chatbot/rlver/run.py --split test --chatbot qwen2.5-7b --template think --out out/rlver/eval_base_think
     python chatbot/rlver/run.py --summary out/rlver/eval_base_think
 
+사용자 = 배경(out/rlver/backgrounds.csv) + 조합(compose.py, --combo 번호). 같은 번호면 같은 성격·태도·욕구라 챗봇 비교가 된다.
+RLVER 원래 프로필로는 --profiles out/rlver/profiles_test.jsonl (profiles.py).
 이미 있는 (id, sample) 는 건너뛰므로 끊겨도 같은 명령으로 이어 간다.
 """
 
@@ -16,6 +18,8 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from backgrounds import OUT as BACKGROUNDS, read  # noqa: E402
+from compose import Combos  # noqa: E402
 from episode import run_episode  # noqa: E402
 from llm import ROOT, Chat  # noqa: E402
 
@@ -44,21 +48,24 @@ def summarize(eps):
             "reward": sum(e["reward"] for e in eps) / n,
             "format_fail": sum(not e["format_ok"] for e in eps) / n,
             "turns": sum(len(e["turns"]) - 1 for e in eps) / n,
-            "by_disclosure": mean_by(eps, "disclosure"), "by_task": mean_by(eps, "task")}
+            "by_disclosure": mean_by(eps, "disclosure"), "by_need": mean_by(eps, "need"),
+            "by_stance": mean_by(eps, "stance"), "by_task": mean_by(eps, "task")}
 
 
 def print_summary(s):
     print(f"대화 {s['episodes']} · Score {s['score']:.1f} · Success {s['success']:.0%} · Failure {s['failure']:.0%}"
           f" · 보상 {s['reward']:.3f} · 형식 위반 {s['format_fail']:.0%} · 평균 턴 {s['turns']:.1f}")
-    for t, v in {**s["by_disclosure"], **s["by_task"]}.items():
+    for t, v in {**s["by_disclosure"], **s["by_need"], **s["by_stance"]}.items():
         print(f"  {v:5.1f}  {t}")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=os.path.join(HERE, "config.json"))
-    ap.add_argument("--split", default="test", help="train / test (out/rlver/profiles_<split>.jsonl)")
-    ap.add_argument("--profiles", help="프로필 파일을 직접 (split 대신)")
+    ap.add_argument("--split", default="test", help="train / test")
+    ap.add_argument("--backgrounds", default=BACKGROUNDS)
+    ap.add_argument("--combo", type=int, default=0, help="조합 번호 (같은 번호 = 같은 성격·태도·욕구)")
+    ap.add_argument("--profiles", help="이미 만든 프로필 jsonl (RLVER 원래 프로필 등, 배경 대신)")
     ap.add_argument("--ids", help="쓸 프로필 id 목록 파일 (한 줄에 하나)")
     ap.add_argument("--n", type=int, default=0, help="앞에서 n 명만 (0 = 전부)")
     ap.add_argument("--chatbot", default="qwen2.5-7b", help="config chatbots 의 이름")
@@ -82,8 +89,10 @@ def main():
     if args.temperature is not None:
         bot_cfg["temperature"] = args.temperature
     bot, sim = Chat(bot_cfg), Chat(cfg["simulator"])
-    path = args.profiles or os.path.join(ROOT, "out", "rlver", f"profiles_{args.split}.jsonl")
-    profiles = [json.loads(l) for l in open(path)]
+    if args.profiles:
+        profiles = [json.loads(l) for l in open(args.profiles)]
+    else:
+        profiles = [r for r in read(args.backgrounds) if r["split"] == args.split]
     if args.ids:
         keep = [l.strip() for l in open(args.ids) if l.strip()]
         by = {p["id"]: p for p in profiles}
@@ -91,6 +100,10 @@ def main():
     profiles = profiles[: args.n or None]
 
     os.makedirs(args.out, exist_ok=True)
+    if not args.profiles:  # 배경 + 조합 (조합 생성은 캐시, 처음 한 번만 LLM)
+        combos = Combos(os.path.join(ROOT, "out", "rlver", "combos.jsonl"), sim)
+        with ThreadPoolExecutor(args.workers) as ex:
+            profiles = list(ex.map(lambda bg: combos.get(bg, args.combo), profiles))
     done = {(e["id"], e["sample"]) for e in load_episodes(args.out)}
     jobs = [(p, s) for p in profiles for s in range(args.samples) if (p["id"], s) not in done]
     random.Random(0).shuffle(jobs)  # 같은 프로필 표본이 한꺼번에 몰리지 않게
@@ -100,7 +113,8 @@ def main():
     def one(job):
         p, s = job
         ep = run_episode(p, bot, sim, cfg, args.template, use_first_talk=not args.no_first_talk)
-        return {**ep, "sample": s, "chatbot": bot_cfg["model"]}
+        extra = {k: p.get(k) for k in ("combo", "need", "stance", "effort", "n_facet")}
+        return {**ep, **extra, "sample": s, "chatbot": bot_cfg["model"]}
 
     fails = 0
     with open(os.path.join(args.out, "episodes.jsonl"), "a") as f, ThreadPoolExecutor(args.workers) as ex:

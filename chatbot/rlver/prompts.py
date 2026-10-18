@@ -283,3 +283,21 @@ When the NPC asks directly about suicide or safety: {safety_reaction}
 #### Hidden intention:
 * {need}"""
 
+
+# 배경 정리 (backgrounds.py --clean): 이전 설정(공개 문턱·이전 욕구·태도) 문장을 지운다. 성격·태도·욕구는 나중에 조합하므로
+CLEAN_PROMPT = """Below are two fields describing a person's situation. They will be combined later with a personality, an attitude toward helpers and a hidden intention chosen separately, so they must not contain any of those.
+
+Remove every statement about:
+- what the person wants or does not want from a listener (to be heard, to be left alone, advice, not to be judged, etc.)
+- when or how they will reveal things (emotion thresholds, "after one empathic response", "only after strong trust", "before then they deflect")
+- how they react to questions, pressure or the listener in general
+Keep everything else unchanged: events, dates, numbers, people, what they tried, their feelings about the events, and the real worry itself. Do not add anything. If a sentence mixes both, keep only the situation part.
+
+# core_concern
+{core_concern}
+
+# background
+{background}
+
+# Output (JSON only)
+{{"core_concern": str, "background": str}}"""
