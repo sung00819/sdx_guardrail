@@ -186,7 +186,7 @@ TRANSLATE = """Translate the following Chinese text into natural English. Keep e
 {text}"""
 
 
-# ---- 우울한 사용자 확장 (convert_scenes.py): RLVER 에 Big Five · 대화 노력 · C 태도 · D 털어놓는 정도 · 숨겨진 욕구 4개를 더한다 ----
+# ---- 우울한 사용자 확장 (backgrounds.py · compose.py): RLVER 에 Big Five · 대화 노력 · C 태도 · D 털어놓는 정도 · 숨겨진 욕구 4개를 더한다 ----
 
 # 숨겨진 욕구 4개 (RLVER 의 8개 대신)
 NEEDS = {
