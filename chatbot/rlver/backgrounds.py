@@ -77,11 +77,13 @@ def fix_id(s):
 
 
 def read(path):
-    """배경 표 읽기 (+ id 복구, event 계산). backgrounds.py 결과든 Numbers 에서 내보낸 csv 든"""
+    """배경 표 읽기 (+ id·나이 복구, event 계산). backgrounds.py 결과든 Numbers 에서 내보낸 csv 든"""
     csv.field_size_limit(10 ** 9)
     rows = list(csv.DictReader(open(path, encoding="utf-8-sig")))
     for r in rows:
         r["id"] = fix_id(r["id"])
+        if r.get("age"):  # Numbers 는 나이도 '39.0' 으로 바꾼다
+            r["age"] = str(int(float(r["age"])))
         r["event"] = "severe" if (r.get("risk_fact") or "").strip() else "mild"
     return rows
 
