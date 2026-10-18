@@ -70,6 +70,7 @@ def main():
                     help="배경마다 돌릴 설정 번호 (0~5 = 원하는 방식 3 × 털어놓는 정도 2, compose.SETTINGS)")
     ap.add_argument("--profiles", help="이미 만든 프로필 jsonl (RLVER 원래 프로필 등, 배경 대신)")
     ap.add_argument("--ids", help="쓸 프로필 id 목록 파일 (한 줄에 하나)")
+    ap.add_argument("--pairs", help="쓸 (배경 id, 설정 번호) 목록 파일 (한 줄에 'id 설정', 학습 반복마다 뽑은 사용자)")
     ap.add_argument("--n", type=int, default=0, help="앞에서 n 명만 (0 = 전부)")
     ap.add_argument("--per_event", type=int, default=0, help="mild·severe 배경을 k 개씩만 (발화 맛보기: k × 2 × 설정 6 대화)")
     ap.add_argument("--chatbot", default="qwen2.5-7b", help="config chatbots 의 이름")
@@ -107,7 +108,11 @@ def main():
     profiles = profiles[: args.n or None]
 
     os.makedirs(args.out, exist_ok=True)
-    if not args.profiles:  # 배경 × 설정 (LLM 없이 조립)
+    if args.pairs:
+        by = {bg["id"]: bg for bg in profiles}
+        pairs = [l.split() for l in open(args.pairs) if l.strip()]
+        profiles = [build(by[i], int(k)) for i, k in pairs]
+    elif not args.profiles:  # 배경 × 설정 (LLM 없이 조립)
         settings = [int(x) for x in args.settings.split(",")]
         assert all(0 <= x < len(SETTINGS) for x in settings), f"설정 번호는 0~{len(SETTINGS) - 1}"
         profiles = [build(bg, k) for bg in profiles for k in settings]
