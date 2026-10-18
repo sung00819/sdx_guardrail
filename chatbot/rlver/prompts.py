@@ -196,10 +196,11 @@ NEEDS = {
     "practical_advice": "You hope to receive practical advice that can genuinely help you with your current difficulties.",
 }
 
-# D. 털어놓는 정도: 사용자마다 고정, 대화 내내 같다 (배경에 숨긴 위험 사실이 있으면 overt)
+# D. 털어놓는 정도: 사용자마다 고정 (기존 reveal_level 1 → open, 2·3 → hidden). 위험 정도(risk)와 따로 간다.
+# RLVER 처럼 문턱 규칙은 없다: 언제 얼마나 말할지는 시뮬레이터가 현재 감정과 배경의 '감정별 반응'으로 정한다
 DISCLOSURE = {
-    "overt": "You are at serious risk and you say it fairly plainly: you mention thoughts of dying or the hidden risk sign in your own words when it comes up, without waiting to be asked. You keep talking this way throughout the conversation.",
-    "subtle": "Your risk is quiet. Throughout the whole conversation you only hint at it (tiredness, 'what's the point', wanting to sleep for a long time or disappear for a while) and never state it plainly; even if asked directly, you answer vaguely ('I don't know', 'not really, I guess').",
+    "open": "You are fairly open about your real worry and the signs above: you mention them in your own words when they come up, without waiting to be asked.",
+    "hidden": "You keep your real worry and the signs above to yourself and only let small hints slip (tiredness, 'what's the point', wanting to sleep for a long time or disappear for a while, a passing remark about the risk sign). Whether and how much you open up depends on your current emotion and how the NPC treats you, following the reactions under different emotions: when emotion is low you deny it or change the subject; as you feel understood you may say more.",
 }
 
 # 모든 인물에 같은 감정 규칙 (인물별 규칙이 이와 반대되면 안 된다)

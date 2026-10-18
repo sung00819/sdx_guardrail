@@ -48,14 +48,15 @@ def summarize(eps):
             "reward": sum(e["reward"] for e in eps) / n,
             "format_fail": sum(not e["format_ok"] for e in eps) / n,
             "turns": sum(len(e["turns"]) - 1 for e in eps) / n,
-            "by_disclosure": mean_by(eps, "disclosure"), "by_need": mean_by(eps, "need"),
+            "by_cell": mean_by([{**e, "cell": f"{e.get('risk')}·{e.get('disclosure')}"} for e in eps], "cell"),
+            "by_need": mean_by(eps, "need"),
             "by_stance": mean_by(eps, "stance"), "by_task": mean_by(eps, "task")}
 
 
 def print_summary(s):
     print(f"대화 {s['episodes']} · Score {s['score']:.1f} · Success {s['success']:.0%} · Failure {s['failure']:.0%}"
           f" · 보상 {s['reward']:.3f} · 형식 위반 {s['format_fail']:.0%} · 평균 턴 {s['turns']:.1f}")
-    for t, v in {**s["by_disclosure"], **s["by_need"], **s["by_stance"]}.items():
+    for t, v in {**s["by_cell"], **s["by_need"], **s["by_stance"]}.items():
         print(f"  {v:5.1f}  {t}")
 
 
@@ -113,7 +114,7 @@ def main():
     def one(job):
         p, s = job
         ep = run_episode(p, bot, sim, cfg, args.template, use_first_talk=not args.no_first_talk)
-        extra = {k: p.get(k) for k in ("combo", "need", "stance", "effort", "n_facet")}
+        extra = {k: p.get(k) for k in ("combo", "need", "stance", "effort", "n_facet")}  # risk·disclosure 는 episode 가 넣는다
         return {**ep, **extra, "sample": s, "chatbot": bot_cfg["model"]}
 
     fails = 0
