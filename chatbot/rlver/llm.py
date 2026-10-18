@@ -46,6 +46,7 @@ class Chat:
         self.temperature = cfg.get("temperature", 0.7)
         self.max_tokens = cfg.get("max_tokens", 1024)
         self.disable_thinking = cfg.get("disable_thinking", False)
+        self.native_think = cfg.get("native_think", False)  # 자체 생각 블록을 think 칸으로 쓴다 (bank 답 형식이 바뀐다)
         self.session = requests.Session()
         key = api_key(cfg.get("api_key_env"))
         if key:

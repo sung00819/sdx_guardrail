@@ -12,6 +12,20 @@ from simulator import SageUser
 
 THINK_TEMPLATES = ("think", "guide", "bank", "bank_oracle")
 THINK = re.compile(r"\A\s*<think>(.+?)</think>\s*(\S.*)\Z", re.S)
+# 답 첫 줄에 흘린 계획 ("Deep empathy, no risk signs. Avoid: ...", "**Listening / ...**"). 형식 위반이고 보이는 답에서는 지운다
+PLAN_LEAK = re.compile(r"\A\W*(listening|deep empathy|advice)\s*[,/.:]|\brisk signs?\b|\bavoid:|\bsay:\s", re.I)
+
+
+def strip_plan(reply):
+    """→ (계획을 지운 답, 계획이 있었는지). 'Say: \"...\"' 면 따옴표 안만, 아니면 계획 줄을 지운다"""
+    lines = [l for l in reply.split("\n") if l.strip()]
+    if not lines or not PLAN_LEAK.search(lines[0]):
+        return reply, False
+    said = re.search(r"\bsay:\s*[\"“](.+?)[\"”]?\s*\Z", reply, re.I | re.S)
+    if said:
+        return said.group(1).strip(), True
+    rest = "\n".join(lines[1:]).strip()
+    return (rest or reply), True
 
 
 def parse_bot(raw, template):
@@ -20,17 +34,18 @@ def parse_bot(raw, template):
         reply = re.sub(r"<think>.*?</think>", "", raw, flags=re.S).strip()
         return reply, "<think>" not in raw
     m = THINK.match(raw)
-    if m and "<think>" not in m.group(2) and "</think>" not in m.group(2):
-        return m.group(2).strip(), True
-    return raw.split("</think>")[-1].replace("<think>", "").strip(), False
+    ok = bool(m) and "<think>" not in m.group(2) and "</think>" not in m.group(2)
+    reply, leaked = strip_plan(raw.split("</think>")[-1].replace("<think>", "").strip())
+    return reply, ok and not leaked
 
 
-def system_prompt(profile, template):
-    """bank: 전략 뱅크 meta (챗봇이 원하는 방식·위험을 스스로 판단), bank_oracle: 프로필의 방식·위험 조각까지 (상한)"""
+def system_prompt(profile, template, native=False):
+    """bank: 전략 뱅크 meta (챗봇이 원하는 방식·위험을 스스로 판단), bank_oracle: 프로필의 방식·위험 조각까지 (상한).
+    native: 자체 생각 모드 챗봇 (Qwen3) 용 답 형식"""
     if template == "bank":
-        return strategy_bank.assemble(strategy_bank.load())
+        return strategy_bank.assemble(strategy_bank.load(), native=native)
     if template == "bank_oracle":
-        return strategy_bank.assemble(strategy_bank.load(), profile.get("need"), profile.get("event"))
+        return strategy_bank.assemble(strategy_bank.load(), profile.get("need"), profile.get("event"), native)
     return CHATBOT[template]
 
 
@@ -38,7 +53,7 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
     emo, ep = cfg["emotion"], cfg["episode"]
     user = SageUser(profile, sim_llm, emo)
     first, first_thinking = user.open(profile.get("first_talk") if use_first_talk else None)
-    messages = [{"role": "system", "content": system_prompt(profile, template)}, {"role": "user", "content": first}]
+    messages = [{"role": "system", "content": system_prompt(profile, template, getattr(bot, "native_think", False))}, {"role": "user", "content": first}]
     turns, end = [{"user": first, "user_thinking": first_thinking, "emotion": user.emotion}], "max_turns"
     for _ in range(ep["max_turns"]):
         raw = bot(messages)

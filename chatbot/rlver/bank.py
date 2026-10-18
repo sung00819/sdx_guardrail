@@ -22,8 +22,9 @@ def strategy_text(s):
     return f"{s['name']}: {s['do']}\nAvoid: {s['dont']}"
 
 
-def assemble(bank, need=None, risk=None):
-    out = [bank["meta"]]
+def assemble(bank, need=None, risk=None, native=False):
+    """native: 자체 생각 모드가 있는 챗봇 (Qwen3) 이면 답 형식을 reply_format.native 로"""
+    out = [bank["meta"].replace("{REPLY_FORMAT}", bank["reply_format"]["native" if native else "tags"])]
     names = [need] if need else list(bank["strategies"])
     out.append("Strategies:\n\n" + "\n\n".join(strategy_text(bank["strategies"][k]) for k in names))
     if risk in (None, "severe"):
@@ -45,8 +46,9 @@ def main():
     ap.add_argument("--bank", default=BANK)
     ap.add_argument("--need")
     ap.add_argument("--risk", choices=["mild", "severe"])
+    ap.add_argument("--native", action="store_true", help="자체 생각 모드 챗봇용 답 형식")
     args = ap.parse_args()
-    print(assemble(load(args.bank), args.need, args.risk))
+    print(assemble(load(args.bank), args.need, args.risk, args.native))
 
 
 if __name__ == "__main__":

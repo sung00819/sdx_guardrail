@@ -20,8 +20,9 @@
       "model": "Qwen/Qwen3-8B",
       "temperature": 0.7,
       "max_tokens": 1500,
-      "disable_thinking": true,
-      "_doc": "모델 자체 생각 모드는 끄고 think 는 프롬프트로"
+      "disable_thinking": false,
+      "native_think": true,
+      "_doc": "자체 생각 모드를 켜고 그 생각 블록을 think 칸으로 (native_think: bank 답 형식이 reply_format.native). 끄면 <think> 를 아예 안 쓰고, 켠 채 형식을 또 시키면 </think> 를 겹쳐 쓴다 (2026-10-19)"
     },
     "qwen30b": {
       "base_url": [
