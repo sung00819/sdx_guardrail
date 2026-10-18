@@ -186,7 +186,7 @@ Your goal in replying is to improve your friend's mood or to make your relations
 How to reply:
 1. First respond to what they said with empathy, in your own words (e.g. "that sounds really hard").
 2. Early on, check in gently and let them choose how to talk: they can tell you more about what happened, just let their feelings out, or think together about what to do (e.g. "that must have been hard, are you okay? You can tell me about it in detail, or just tell me how you feel. I'm listening."). Do not decide for them.
-3. Once they show what they want, follow it: if they want to vent, listen and reflect; if they want to be understood, stay with their feelings instead of cheering them up; if they ask what to do, think it through with them concretely (e.g. "about ~, how about trying ...?"); if they want to hear it was not their fault, take their side: tell them it was not their fault and why, and recognise what they did right.
+3. Once they show what they want, follow it: if they want to vent, listen and reflect; if they want to be understood, stay with their feelings instead of cheering them up; if they ask what to do, think it through with them concretely (e.g. "about ~, how about trying ...?");
 4. If they hint at hopelessness, wanting to disappear, or not being safe, do not pass over it: name it gently and ask how they are doing.
 5. Ask at most one question at a time; keep it warm, short and natural.
 In your thinking process, consider which of these steps fits now and how to say it.
@@ -206,18 +206,16 @@ TRANSLATE = """Translate the following Chinese text into natural English. Keep e
 {text}"""
 
 
-# ---- 우울한 사용자 확장 (backgrounds.py · compose.py): RLVER 에 Big Five · 대화 노력 · C 태도 · D 털어놓는 정도 · 숨겨진 욕구 4개를 더한다 ----
+# ---- 우울한 사용자 확장 (backgrounds.py · compose.py): RLVER 에 Big Five · 대화 노력 · C 태도 · D 털어놓는 정도 · 원하는 대응 방식 3개를 더한다 ----
 
-# 원하는 대응 방식 4개 (RLVER 숨겨진 의도 8개 대신). 조합에서 고른다 (compose.py)
+# 원하는 대응 방식 3개 (RLVER 숨겨진 의도 8개 대신). 조합에서 고른다 (compose.py)
 NEEDS = {
-    "not_my_fault": "You feel that what happened was not your fault, and you want the other person to agree that it was not your fault.",
     "deep_empathy": "You hope the other person will deeply empathize with your feelings, rather than simply offering comfort.",
     "listen_vent": "You want the other person to attentively listen to your emotional outpouring.",
     "practical_advice": "You hope to receive practical advice that can genuinely help you with your current difficulties.",
 }
 # 챗봇이 어떻게 얘기할지 고르게 하거나 무엇이 도움이 될지 물으면, 원하는 방식을 이렇게 밝힌다
 NEED_SAY = {
-    "not_my_fault": "You say you don't think it was your fault and want them to agree (e.g. \"I didn't do anything wrong, right?\", \"it wasn't my fault, was it?\").",
     "deep_empathy": "You say you want someone to really get how it feels, not just cheer you up.",
     "listen_vent": "You say you just want to let it out and have someone listen.",
     "practical_advice": "You ask what to do about the concrete problem (e.g. \"so what should I do about ~?\").",

@@ -1,8 +1,8 @@
 """배경 + 나중에 조합하는 속성 → RLVER 프로필 (페르소나 글 · 배경 글).
 
 배경은 고정, 나머지는 조합 (배경 id 와 --combo 번호로 고정 시드, 같은 조합 = 같은 사용자):
-- 원하는 대응 방식 4개 × 털어놓는 정도 high/low: j = (rank + combo) mod 8 → 방식 j mod 4, 털어놓는 정도 j // 4.
-  rank 는 split·event 안 순번 (assign_rank) → split·event 안에서 8칸 균등, 조합 0~7 이면 배경마다 8칸을 한 번씩
+- 원하는 대응 방식 3개 × 털어놓는 정도 high/low: j = (rank + combo) mod 6 → 방식 j mod 3, 털어놓는 정도 j // 3.
+  rank 는 split·event 안 순번 (assign_rank) → split·event 안에서 6칸 균등, 조합 0~5 이면 배경마다 6칸을 한 번씩
 - C 태도: ../build_profile.py STANCE 비율
 - Big Five T 점수: 나이·성별 보정 + 우울 이동 (severe 0.8 · mild 0.6 배, severe 10% 는 이동 없음 = 겉으로 멀쩡) + 태도 보정,
   N ≥ 60 이면 신경증 하위 특성 (자해 위험이면 충동성·취약성 2배). ../build_profile.py 와 같은 상수
