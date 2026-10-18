@@ -99,6 +99,13 @@ def main():
 
     csv.field_size_limit(10 ** 9)
     rows = list(csv.DictReader(open(args.src, encoding="utf-8-sig")))
+    if "event" not in rows[0]:  # 원래 표 (backgrounds_750.csv): O 셀 빼고 event 를 risk_fact 로 정한다
+        rows = [r for r in rows if r.get("cell") != "O"]
+        for r in rows:
+            r["event"] = "severe" if r.get("risk_fact", "").strip() else "mild"
+    for r in rows:
+        if "needs_clean" not in r:
+            r["needs_clean"] = "1" if suspicious(r) else "0"
     fields = list(rows[0].keys())
     cache_path = args.out + ".cache.jsonl"
     done = {}
