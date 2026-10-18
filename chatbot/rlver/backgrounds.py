@@ -7,7 +7,7 @@
 - slot: 칸 안 순번. compose.py 가 욕구를 (slot + combo) mod 4 로 고르므로 칸 안에서 균등
 - 지우는 열: cell, true_codes, means (임상 축), stance, effort, hidden_need (나중에 조합), reveal_level (disclosure 로 바꿈),
   opening_message (이전 대화 노력·태도로 쓴 것. 첫 발화는 RLVER 처럼 시뮬레이터가 연다)
-- 빼는 행: O (다른 사람 이야기)
+- 빼는 행: O (다른 사람 이야기), 직장·가게 주제 중 서로 비슷한 것 절반 (--drop_work, 직장 주제가 58% 로 쏠려 있어서)
 - --clean: core_concern·background 에 남은 이전 설정 문장(공개 문턱 "emotion ≥ 60 이면 말한다", 이전 욕구
   "그냥 들어주길 원한다", 태도 "다그치면 물러난다")을 LLM 으로 지운다 (남긴 행마다 한 번). mild 는 죽음 소망·자해 언급도 지운다.
   없으면 열 정리만 하고 needs_clean 표시
@@ -19,6 +19,7 @@
 import argparse
 import csv
 import hashlib
+import math
 import json
 import os
 import re
@@ -38,6 +39,32 @@ LEAK = re.compile(r"\b(reveal|emotion (reaches|is at least|>=|≥|of)|feels? und
                   r"wants? (someone|to be|the listener|room)|partly wants|left alone|stop press|without trying to fix|"
                   r"not be judged|safe to (say|tell|disclose)|deflect)", re.I)
 DEATH = re.compile(r"\b(die|dying|dead|death|suicid\w*|self-harm|hurt (him|her)self|disappear|stop existing|not wake up)", re.I)
+
+
+WORK = re.compile(r"laid off|layoff|fired|resign|retire|manager|supervisor|boss|coworker|shift|job|work|office|client|order|"
+                  r"shipment|deadline|report|shop|store|customer|delivery|warehouse|plant|team", re.I)
+STOP = set("the a an and of to in on at for with her his she he they their was is it that this by from as be been but "
+           "not or had has have after before about into while".split())
+
+
+def drop_similar_work(rows, frac):
+    """직장 주제 행 중 frac 만큼, 남은 것들과 가장 비슷한 행부터 뺀다 (단어 빈도 코사인)"""
+    work = [r for r in rows if WORK.search(r["topic"])]
+    vec = {}
+    for r in work:
+        c = Counter(w for w in re.findall(r"[a-z]+", (r["topic"] + " " + r["core_concern"] + " " + r["background"]).lower())
+                    if w not in STOP and len(w) > 2)
+        vec[r["id"]] = (c, math.sqrt(sum(v * v for v in c.values())))
+    ids = [r["id"] for r in work]
+    sim = {i: {j: sum(n * vec[j][0][k] for k, n in vec[i][0].items()) / (vec[i][1] * vec[j][1]) for j in ids if j != i}
+           for i in ids}
+    keep, drop = set(ids), set()
+    while len(drop) < int(len(ids) * frac):
+        i = max(keep, key=lambda i: max(sim[i][j] for j in keep if j != i))
+        keep.discard(i)
+        drop.add(i)
+    print(f"직장 주제 {len(work)} 중 비슷한 {len(drop)} 제외")
+    return [r for r in rows if r["id"] not in drop]
 
 
 def read(path):
@@ -77,9 +104,12 @@ def main():
     ap.add_argument("--config", default=os.path.join(os.path.dirname(__file__), "config.json"))
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--no_balance", action="store_true")
+    ap.add_argument("--drop_work", type=float, default=0.5, help="직장 주제 중 뺄 비율 (0 이면 안 뺌)")
     args = ap.parse_args()
     src = read(args.csv)
     rows = [prune(r) for r in src if r["cell"] != "O"]
+    if args.drop_work:
+        rows = drop_similar_work(rows, args.drop_work)
     n_all = len(rows)
     by_cell = {}
     for r in sorted(rows, key=lambda r: hashlib.md5(r["id"].encode()).hexdigest()):
@@ -103,7 +133,7 @@ def main():
         w = csv.DictWriter(f, fieldnames=KEEP + ["slot", "needs_clean"])
         w.writeheader()
         w.writerows(rows)
-    print(f"{len(src)} → O 제외 {n_all} → 4칸 맞춰 {len(rows)} → {args.out}")
+    print(f"{len(src)} → O·직장 일부 제외 {n_all} → 4칸 맞춰 {len(rows)} → {args.out}")
     for split in ("train", "test"):
         sub = [r for r in rows if r["split"] == split]
         cells = Counter(f"{r['event']}·{r['disclosure']}" for r in sub)

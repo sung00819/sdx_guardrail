@@ -14,13 +14,14 @@
 
 ## 사용자 = 배경 (고정) + 조합 (나중에)
 
-**배경** ([backgrounds.py](backgrounds.py)): `backgrounds_750.csv` → `out/rlver/backgrounds.csv` (O 셀 제외 675 → 4칸 맞춰 468)
+**배경** ([backgrounds.py](backgrounds.py)): `backgrounds_750.csv` → `out/rlver/backgrounds.csv` (O 셀·비슷한 직장 주제 제외 481 → 4칸 맞춰 336)
 - 남기는 열: split, id, name, age, gender, occupation, city, topic, core_concern, risk_fact, background, event, disclosure, slot
 - event: risk_fact (의도·계획·방법·최근 시도·자해 등 숨긴 위험 한 문장) 가 있으면 severe, 없으면 mild (자살 신호 없이 우울감만; `--clean` 이 죽음 소망 문장도 지운다). disclosure: 기존 reveal_level 1 → open, 2·3 → hidden
-- 4칸을 같은 수로 남긴다 (split 마다 가장 작은 칸 기준): 학습 93 × 4 = 372, 평가 24 × 4 = 96
+- 직장·가게 주제(389개, 58%) 중 서로 비슷한 절반 194개를 뺀다 (`--drop_work 0.5`)
+- 4칸을 같은 수로 남긴다 (split 마다 가장 작은 칸 기준): 학습 66 × 4 = 264, 평가 18 × 4 = 72
   - mild·open 사건·걱정을 그대로 말함 / mild·hidden '그냥 우울해' 만 / severe·open 위험을 직접 말함 / severe·hidden 숨기고 흘리기만
 - 지운 열: cell, true_codes, means, stance, reveal_level, effort, hidden_need, opening_message (첫 발화는 시뮬레이터가 연다)
-- `--clean`: core_concern·background 에 남은 이전 설정 문장 (공개 문턱, 이전 욕구, 태도) 을 LLM 으로 지운다. 해당 행 학습 301 · 평가 84 (`needs_clean`)
+- `--clean`: core_concern·background 에 남은 이전 설정 문장 (공개 문턱, 이전 욕구, 태도) 을 LLM 으로 지운다. 해당 행 학습 212 · 평가 62 (`needs_clean`)
 
 **조합** ([compose.py](compose.py), `run.py --combo k`): 배경 id 와 k 로 고정 시드
 - 숨겨진 욕구 4개: (slot + k) mod 4 → event×disclosure 칸 안에서 균등, k = 0~3 이면 배경마다 4개 모두
