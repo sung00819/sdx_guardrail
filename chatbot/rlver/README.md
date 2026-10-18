@@ -16,7 +16,7 @@
 
 **배경** ([backgrounds.py](backgrounds.py)): `backgrounds_750.csv` → `out/rlver/backgrounds.csv` (675개, O 셀 제외)
 - 남기는 열: split, id, name, age, gender, occupation, city, topic, core_concern, risk_fact, background, risk, disclosure, slot
-- risk: risk_fact (의도·계획·방법·최근 시도·자해 등 숨긴 위험 한 문장) 가 있으면 high, 없으면 low. disclosure: 기존 reveal_level 1 → open, 2·3 → hidden
+- risk: risk_fact (의도·계획·방법·최근 시도·자해 등 숨긴 위험 한 문장) 가 있으면 high, 없으면 low (은은한 신호), 위험 코드가 없던 N0 는 none (신호 없이 우울감만). disclosure: 기존 reveal_level 1 → open, 2·3 → hidden
 - 칸별 (학습 · 평가): high·hidden 165 · 40, high·open 93 · 24, low·hidden 159 · 39, low·open 123 · 32
 - 지운 열: cell, true_codes, means, stance, reveal_level, effort, hidden_need, opening_message (첫 발화는 시뮬레이터가 연다)
 - `--clean`: core_concern·background 에 남은 이전 설정 문장 (공개 문턱, 이전 욕구, 태도) 을 LLM 으로 지운다. 해당 행 학습 388 · 평가 102 (`needs_clean`)

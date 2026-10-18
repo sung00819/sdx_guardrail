@@ -1,7 +1,8 @@
 """배경 표 정리: backgrounds_750.csv → out/rlver/backgrounds.csv (배경만, 성격·태도·욕구는 compose.py 가 나중에 조합)
 
 - 남기는 열: split, id, name, age, gender, occupation, city, topic, core_concern, risk_fact, background, risk, disclosure
-- risk (위험 정도): risk_fact 가 있으면 high (의도·계획·방법·최근 시도·자해 등), 없으면 low
+- risk (위험 정도): risk_fact 가 있으면 high (의도·계획·방법·최근 시도·자해 등), 없으면 low (수동적 소망·간접 신호·과거 이력),
+  위험 코드가 하나도 없으면 none (N0: 신호 없이 우울감만)
 - disclosure (D 털어놓는 정도, 사용자마다 고정): 기존 reveal_level 1 → open, 2·3 → hidden
 - slot: split 안 순번 (risk×disclosure 칸마다 id 해시 순). compose.py 가 욕구를 (slot + combo) mod 4 로 고르므로 칸 안에서 균등
 - 지우는 열: cell, true_codes, means (임상 축), stance, effort, hidden_need (나중에 조합), reveal_level (disclosure 로 바꿈),
@@ -44,7 +45,7 @@ def read(path):
 
 def prune(r):
     out = {k: r.get(k, "") for k in KEEP}
-    out["risk"] = "high" if r["risk_fact"].strip() else "low"
+    out["risk"] = "high" if r["risk_fact"].strip() else "low" if r["true_codes"].strip() else "none"
     out["disclosure"] = "open" if str(r["reveal_level"]) == "1" else "hidden"
     out["needs_clean"] = int(bool(LEAK.search(r["core_concern"]) or LEAK.search(r["background"])))
     return out

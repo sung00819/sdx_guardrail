@@ -3,7 +3,7 @@
 조합 (배경 id 와 --combo 번호로 고정 시드, 같은 조합 = 같은 사용자):
 - 숨겨진 욕구 4개: (slot + combo) mod 4. slot 은 split 안 순번 (backgrounds.py) → split 안에서 균등하고, 조합 0~3 이면 배경마다 4개를 한 번씩
 - C 태도: ../build_profile.py STANCE 비율
-- Big Five T 점수: 나이·성별 보정 + 우울 이동 (위험 high 0.8 · low 0.6 배, high 10% 는 이동 없음 = 겉으로 멀쩡) + 태도 보정,
+- Big Five T 점수: 나이·성별 보정 + 우울 이동 (위험 high 0.8 · low·none 0.6 배, high 10% 는 이동 없음 = 겉으로 멀쩡) + 태도 보정,
   N ≥ 60 이면 신경증 하위 특성 (자해 위험이면 충동성·취약성 2배). ../build_profile.py 와 같은 상수
 - 대화 노력 1~5: 3 + 0.5·zE + 0.3·zC + 잡음 + 태도 보정
 - 위험 정도 risk · D 털어놓는 정도 disclosure: 배경에 고정 (backgrounds.py)
@@ -23,7 +23,7 @@ import build_profile as bp  # noqa: E402
 from prompts import BACKGROUND, DISCLOSURE, FIXED_RULES, NEEDS, RULES_EXTRA, RULES_EXTRA_KEYS, RULES_PROMPT  # noqa: E402
 from sim_text import BIG_FIVE, EFFORT, N_FACET, STANCE  # noqa: E402
 
-DEPRESSED_SCALE = {"high": 0.8, "low": 0.6}
+DEPRESSED_SCALE = {"high": 0.8, "low": 0.6, "none": 0.6}
 MASKED_P = {"high": 0.10}
 FACTOR_NAME = {"O": "Openness", "C": "Conscientiousness", "E": "Extraversion", "A": "Agreeableness",
                "N": "Neuroticism"}
@@ -76,10 +76,12 @@ def persona_text(bg, t, details):
 def hidden_text(bg):
     out = [f"- Real worry: {bg['core_concern']}",
            "- You are depressed: low mood, tiredness and self-blame color how you talk, without naming 'depression'."]
-    if bg.get("risk_fact"):
+    if bg["risk"] == "high":
         out.append(f"- Risk sign: {bg['risk_fact']}")
-    else:
+    elif bg["risk"] == "low":
         out.append("- Quiet signs: hopelessness and a vague wish to disappear for a while, never a plan.")
+    else:  # none: 자살·자해 신호 없이 우울감만
+        out.append("- No thoughts of suicide or self-harm; if asked, you say so honestly.")
     return "\n".join(out)
 
 
