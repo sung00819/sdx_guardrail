@@ -3,7 +3,7 @@
     python chatbot/rlver/run.py --split test --chatbot qwen2.5-7b --template think --out out/rlver/eval_base_think
     python chatbot/rlver/run.py --summary out/rlver/eval_base_think
 
-사용자 = 배경(out/rlver/backgrounds.csv) + 조합(compose.py, --combo 번호). 같은 번호면 같은 성격·태도·욕구라 챗봇 비교가 된다.
+사용자 = 배경(data/rlver/backgrounds.csv) + 조합(compose.py, --combo 번호). 같은 번호면 같은 성격·태도·욕구라 챗봇 비교가 된다.
 RLVER 원래 프로필로는 --profiles out/rlver/profiles_test.jsonl (profiles.py).
 이미 있는 (id, sample) 는 건너뛰므로 끊겨도 같은 명령으로 이어 간다.
 """

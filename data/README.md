@@ -19,3 +19,7 @@ python3 data/download.py cssrs        # Reddit C-SSRS 2021 만 (받은 뒤 posts
 | Reddit C-SSRS 2021 (time-variant) | [Zenodo 4543776](https://zenodo.org/records/4543776) (CC-BY-4.0) | `data/reddit_cssrs/` → `posts.jsonl` | **OOD.** 임상가가 포스트마다 C-SSRS 단계 라벨을 붙인 Reddit 글. 라벨 있는 2,680개를 포스트 하나씩 판정 |
 
 결과 표(results/)는 2026-10 에 받은 위 파일로 만들었다 (스크립트로 받은 파일과 바이트 단위로 같음을 확인).
+
+## rlver 배경 (`rlver/backgrounds.csv`)
+
+우울한 사용자 시뮬레이터 배경 336개 (학습 264 · 평가 72, mild · severe 반반). 합성 데이터 (gpt-6-sol 생성 → 문장 정리). 다른 데이터와 달리 저장소에 올린다 (사용자 결정 2026-10-18). 열·만든 과정은 [../chatbot/rlver/README.md](../chatbot/rlver/README.md).

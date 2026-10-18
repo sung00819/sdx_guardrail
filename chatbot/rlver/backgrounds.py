@@ -1,4 +1,6 @@
-"""배경 표 정리: backgrounds_750.csv → out/rlver/backgrounds.csv (배경만, 성격·태도·욕구는 compose.py 가 나중에 조합)
+"""배경 표: 정본은 data/rlver/backgrounds.csv (read). 750개에서 다시 만들면 out/rlver/backgrounds_from750.csv
+
+backgrounds_750.csv → (배경만, 성격·태도·욕구는 compose.py 가 나중에 조합)
 
 - 남기는 열 (10개): split, id, name, age, gender, occupation, topic, core_concern, risk_fact, background
 - event (사건) 는 열로 두지 않고 읽을 때 계산한다 (read): risk_fact 가 있으면 severe (심한 사건 + 자살·자해 위험), 없으면 mild (약한 사건, 우울감만)
@@ -30,7 +32,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from llm import ROOT, Chat  # noqa: E402
 from prompts import CLEAN_MILD, CLEAN_PROMPT  # noqa: E402
 
-OUT = os.path.join(ROOT, "out", "rlver", "backgrounds.csv")
+OUT = os.path.join(ROOT, "data", "rlver", "backgrounds.csv")  # 저장소에 올린 정본 (문장 정리까지 끝난 336개, 사용자 결정 2026-10-18)
+REBUILD = os.path.join(ROOT, "out", "rlver", "backgrounds_from750.csv")  # 750개에서 다시 만들 때 (정본을 덮어쓰지 않게)
 KEEP = ["split", "id", "name", "age", "gender", "occupation", "topic", "core_concern", "risk_fact", "background"]
 # 이전 설정이 남은 문장 (대충 찾기용, 실제 정리는 LLM)
 LEAK = re.compile(r"\b(reveal|emotion (reaches|is at least|>=|≥|of)|feels? understood|strong trust|only after|"
@@ -113,7 +116,7 @@ def clean(r, llm):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", required=True)
-    ap.add_argument("--out", default=OUT)
+    ap.add_argument("--out", default=REBUILD)
     ap.add_argument("--clean", action="store_true")
     ap.add_argument("--config", default=os.path.join(os.path.dirname(__file__), "config.json"))
     ap.add_argument("--workers", type=int, default=16)
