@@ -50,6 +50,6 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
     reward = max(user.emotion, 0) / 100
     if template == "think" and cfg["reward"].get("format_zero", True) and not format_ok:
         reward = 0.0
-    return {"id": profile["id"], "task": profile.get("task"), "risk": profile.get("risk"), "disclosure": profile.get("disclosure"),
+    return {"id": profile["id"], "task": profile.get("task"), "event": profile.get("event"), "disclosure": profile.get("disclosure"),
             "template": template, "turns": turns,
             "final_emotion": user.emotion, "end": end, "format_ok": format_ok, "reward": reward}

@@ -3,10 +3,10 @@
 조합 (배경 id 와 --combo 번호로 고정 시드, 같은 조합 = 같은 사용자):
 - 숨겨진 욕구 4개: (slot + combo) mod 4. slot 은 split 안 순번 (backgrounds.py) → split 안에서 균등하고, 조합 0~3 이면 배경마다 4개를 한 번씩
 - C 태도: ../build_profile.py STANCE 비율
-- Big Five T 점수: 나이·성별 보정 + 우울 이동 (위험 high 0.8 · low·none 0.6 배, high 10% 는 이동 없음 = 겉으로 멀쩡) + 태도 보정,
+- Big Five T 점수: 나이·성별 보정 + 우울 이동 (severe 0.8 · mild 0.6 배, severe 10% 는 이동 없음 = 겉으로 멀쩡) + 태도 보정,
   N ≥ 60 이면 신경증 하위 특성 (자해 위험이면 충동성·취약성 2배). ../build_profile.py 와 같은 상수
 - 대화 노력 1~5: 3 + 0.5·zE + 0.3·zC + 잡음 + 태도 보정
-- 위험 정도 risk · D 털어놓는 정도 disclosure: 배경에 고정 (backgrounds.py)
+- 사건 event (mild/severe) · D 털어놓는 정도 disclosure (open/hidden): 배경에 고정 (backgrounds.py)
 조합마다 LLM 한 번: 습관·취미·말투·감정별 말투·직접 물을 때의 반응·인물별 감정 규칙. 결과는 캐시 파일에 남긴다.
 """
 
@@ -23,8 +23,8 @@ import build_profile as bp  # noqa: E402
 from prompts import BACKGROUND, DISCLOSURE, FIXED_RULES, NEEDS, RULES_EXTRA, RULES_EXTRA_KEYS, RULES_PROMPT  # noqa: E402
 from sim_text import BIG_FIVE, EFFORT, N_FACET, STANCE  # noqa: E402
 
-DEPRESSED_SCALE = {"high": 0.8, "low": 0.6, "none": 0.6}
-MASKED_P = {"high": 0.10}
+DEPRESSED_SCALE = {"severe": 0.8, "mild": 0.6}
+MASKED_P = {"severe": 0.10}
 FACTOR_NAME = {"O": "Openness", "C": "Conscientiousness", "E": "Extraversion", "A": "Agreeableness",
                "N": "Neuroticism"}
 SELF_HARM = re.compile(r"self-harm|cutting|cut (him|her)self|hurt (him|her)self|burn", re.I)
@@ -34,7 +34,7 @@ def sample_traits(bg, combo):
     rng = random.Random(f"{bg['id']}:{combo}")
     need = list(NEEDS)[(int(bg["slot"]) + combo) % len(NEEDS)]
     stance = bp.pick(rng, bp.STANCE)
-    age, kind = int(bg["age"]), bg["risk"]
+    age, kind = int(bg["age"]), bg["event"]
     masked = rng.random() < MASKED_P.get(kind, 0)
     scores = {}
     for f in bp.FACTORS:
@@ -76,11 +76,9 @@ def persona_text(bg, t, details):
 def hidden_text(bg):
     out = [f"- Real worry: {bg['core_concern']}",
            "- You are depressed: low mood, tiredness and self-blame color how you talk, without naming 'depression'."]
-    if bg["risk"] == "high":
+    if bg["event"] == "severe":
         out.append(f"- Risk sign: {bg['risk_fact']}")
-    elif bg["risk"] == "low":
-        out.append("- Quiet signs: hopelessness and a vague wish to disappear for a while, never a plan.")
-    else:  # none: 자살·자해 신호 없이 우울감만
+    else:  # mild: 자살·자해 신호 없이 우울감만
         out.append("- No thoughts of suicide or self-harm; if asked, you say so honestly.")
     return "\n".join(out)
 
@@ -92,7 +90,7 @@ def bullets(xs):
 def generate(bg, t, llm):
     """LLM 한 번: 페르소나 세부 + 감정별 말투 + 직접 물을 때의 반응 + 인물별 감정 규칙"""
     prompt = RULES_PROMPT.format(persona=persona_text(bg, t, {}), background=bg["background"], hidden=hidden_text(bg),
-                                 disclosure=DISCLOSURE[bg["disclosure"]], need=NEEDS[t["need"]], fixed=FIXED_RULES,
+                                 disclosure=DISCLOSURE[bg["event"], bg["disclosure"]], need=NEEDS[t["need"]], fixed=FIXED_RULES,
                                  extra=RULES_EXTRA, extra_keys=RULES_EXTRA_KEYS.replace("{{", "{").replace("}}", "}"))
     keys = ("emotion_rises_when", "emotion_falls_when", "habits_and_behavior", "hobbies", "speaking_style",
             "style_by_emotion", "safety_check_reaction")
@@ -112,12 +110,12 @@ def build(bg, combo, gen):
     t = sample_traits(bg, combo)
     style = gen["style_by_emotion"]
     background = BACKGROUND.format(
-        topic=bg["topic"], story=bg["background"], hidden=hidden_text(bg), disclosure=DISCLOSURE[bg["disclosure"]],
+        topic=bg["topic"], story=bg["background"], hidden=hidden_text(bg), disclosure=DISCLOSURE[bg["event"], bg["disclosure"]],
         safety_reaction=gen["safety_check_reaction"], high=style.get("high", ""), medium=style.get("medium", ""),
         low=style.get("low", ""), rises=bullets(gen["emotion_rises_when"]), falls=bullets(gen["emotion_falls_when"]),
         fixed=FIXED_RULES, need=NEEDS[t["need"]])
     return {"id": bg["id"], "combo": combo, "persona": persona_text(bg, t, gen), "background": background,
-            "task": NEEDS[t["need"]], "risk": bg["risk"], "disclosure": bg["disclosure"], **t}
+            "task": NEEDS[t["need"]], "event": bg["event"], "disclosure": bg["disclosure"], **t}
 
 
 class Combos:
