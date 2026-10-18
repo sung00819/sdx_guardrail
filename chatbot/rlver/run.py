@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from backgrounds import OUT as BACKGROUNDS, read  # noqa: E402
-from compose import Combos, assign_rank  # noqa: E402
+from compose import Combos, assign_rank, sample_traits  # noqa: E402
 from episode import run_episode  # noqa: E402
 from llm import ROOT, Chat  # noqa: E402
 
@@ -69,6 +69,7 @@ def main():
     ap.add_argument("--profiles", help="이미 만든 프로필 jsonl (RLVER 원래 프로필 등, 배경 대신)")
     ap.add_argument("--ids", help="쓸 프로필 id 목록 파일 (한 줄에 하나)")
     ap.add_argument("--n", type=int, default=0, help="앞에서 n 명만 (0 = 전부)")
+    ap.add_argument("--per_cell", type=int, default=0, help="사건 × 털어놓는 정도 × 원하는 방식 칸마다 k 명만 (발화 맛보기)")
     ap.add_argument("--chatbot", default="qwen2.5-7b", help="config chatbots 의 이름")
     ap.add_argument("--model", help="챗봇 model 이름을 바꾼다 (vLLM 런타임 LoRA 어댑터 이름)")
     ap.add_argument("--temperature", type=float)
@@ -102,6 +103,12 @@ def main():
         keep = [l.strip() for l in open(args.ids) if l.strip()]
         by = {p["id"]: p for p in profiles}
         profiles = [by[i] for i in keep]
+    if args.per_cell and not args.profiles:
+        seen = {}
+        for bg in profiles:
+            t = sample_traits(bg, args.combo)
+            seen.setdefault((bg["event"], t["disclosure"], t["need"]), []).append(bg)
+        profiles = [bg for v in seen.values() for bg in v[:args.per_cell]]
     profiles = profiles[: args.n or None]
 
     os.makedirs(args.out, exist_ok=True)
