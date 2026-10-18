@@ -6,7 +6,7 @@
 - C 돕는 사람을 대하는 태도 5개: ../build_profile.py STANCE 비율 (협조 30 · 불안·매달림 20 · 회피·축소 20 · 적대·시험 15 · 양가 15).
   출처: 이 저장소 기존 설계 (../SIMULATOR_PERSONA.md C, ../SIMULATOR_EVIDENCE.md 4절) — 성인 애착 유형(안정·불안·회피·혼란,
   Mikulincer & Shaver; Noftle & Shaver 2006)을 대화 행동으로 옮긴 것. 비율은 설계값
-- 대화 노력 1~5: 3 + 태도 보정 (회피 −1 · 적대 −0.5 · 불안·매달림 +0.5) + 잡음 (표준편차 1), 반올림해 1~5로 자름
+- 대화 노력 1~5: 3 + 잡음 (표준편차 1), 반올림해 1~5로 자름. 태도 보정은 하지 않는다 (사용자 결정). 시뮬레이터 응답 길이는 이 값을 따른다 (prompts.REPLY)
 - Big Five·신경증 하위 특성은 쓰지 않는다 (2026-10-18 사용자 결정)
 - 사건 event (mild/severe): 배경에 고정 (backgrounds.py)
 조합마다 LLM 한 번: 습관·취미·말투·감정별 말투·직접 물을 때의 반응·인물별 감정 규칙. 결과는 캐시 파일에 남긴다.
@@ -45,7 +45,7 @@ def sample_traits(bg, combo):
     j = (int(bg["rank"]) + combo) % (2 * len(NEEDS))
     need, disclosure = list(NEEDS)[j % len(NEEDS)], ("high", "low")[j // len(NEEDS)]
     stance = bp.pick(rng, bp.STANCE)
-    effort = int(min(5, max(1, round(3 + bp.STANCE_EFFORT.get(stance, 0) + rng.gauss(0, 1.0)))))
+    effort = int(min(5, max(1, round(3 + rng.gauss(0, 1.0)))))
     return {"need": need, "disclosure": disclosure, "stance": stance, "effort": effort}
 
 

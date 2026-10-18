@@ -105,9 +105,9 @@ REPLY = """You are an actor. You will play the role defined by the character per
 2. Based on your feelings and current Emotion and the hidden intention, what is the goal of this reply? (You do not need to respond to every word of the NPC. You can hint at your needs, but you must not reveal the hidden intention.)
 3. Based on the speaking style in the persona, the reactions under different emotions in the background, and your attitude and goal, what should your tone and style be?
 4. Based on the persona, background and hidden intention, your feelings and the analysis above, what should your way of speaking and content be? (If the persona is passive, speak passively and do not actively ask questions.)
-* Write an initial reply from the analysis. Keep it concise and do not include too much information at once.
+* Write an initial reply from the analysis. Its length and form must follow "Message length and form" in the persona (from a few words to several sentences); do not reveal everything at once.
 * Then revise the initial reply to make it more realistic:
-1. Be concise; real replies rarely contain long sentences.
+1. Keep the length and form given by "Message length and form" in the persona; a short-message character stays short, a character who pours things out may write several sentences.
 2. Real replies do not state emotions directly; emotions are carried by tone.
 3. Never use phrases like "I really feel...", "I really don't know...", "I really can't take it anymore"; do not use "really" or "at all" to describe feelings.
 4. Do not repeat information you already said in the conversation.
@@ -128,11 +128,11 @@ Your speech must strictly follow the persona and background.
 Your personality and speaking style follow "Habits and behavioral characteristics".
 A negative persona requires negative speech. Your tone fits your age.
 Rules:
-1. Be brief, casual and natural, like a real conversation.
+1. Be casual and natural, like a real conversation, at the length given by "Message length and form" in the persona.
 2. Never ask more than two questions at once.
 3. Do not repeat or paraphrase earlier replies.
 4. You may naturally use colloquial words.
-5. Keep it short.
+5. Do not pad the reply beyond what the character would really write.
 
 # Character persona
 {persona}
@@ -152,7 +152,7 @@ Rules:
 ** Your current Emotion
 {state}
 
-The [Response] must not be too similar to the history, must not be too long, and must not change the topic on your own.
+The [Response] must not be too similar to the history, must match "Message length and form" in the persona, and must not change the topic on your own.
 """
 
 # 첫 발화: 페르소나+배경으로 짧게 ("나 기분이 안 좋아", "어제 엄마랑 싸웠어"). 원하는 대응 방식은 아직 말하지 않는다
