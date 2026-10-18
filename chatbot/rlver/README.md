@@ -12,7 +12,7 @@
 | 보상 r = max(e_T, 0) / 100, think 템플릿 형식 위반이면 0 | 숨겨진 의도 8개 대신 원하는 대응 방식 3개: 위로 말고 깊은 공감 · 쏟아내는 걸 들어주기 · 실질적 조언. 챗봇이 고르게 하면 사용자가 밝힌다 (대화 흐름) |
 | 챗봇 템플릿 think-then-say / nothink (+ SAGE 평가용 `sage`) | |
 
-## 사용자 = 배경 (고정) + 조합 (나중에)
+## 사용자 = 배경 (고정) × 설정 6개
 
 **배경** ([`data/rlver/backgrounds.csv`](../../data/rlver/backgrounds.csv), 저장소에 올린 정본, [backgrounds.py](backgrounds.py) 로 만들고 문장 정리까지 끝낸 336개)
 - 열 (10개): split, id, name, age, gender, occupation, topic, core_concern, risk_fact, background. 지운 열: city, event, slot, disclosure, needs_clean, opening_message, 임상 축 (cell, true_codes, means), 이전 설정 (stance, reveal_level, effort, hidden_need)
@@ -21,25 +21,25 @@
 - O 셀과 서로 비슷한 직장 주제 절반은 뺐다. 이전 설정 문장 (공개 문턱·이전 욕구·태도·시작 감정) 과 mild 의 죽음 소망·자해 문장은 지웠다
 - 첫 메시지 (`opening_message`) 는 없다: 이전 대화 노력·태도로 쓴 것이라 지웠고, 시뮬레이터가 대화 시작에 쓴다
 
-**조합** ([compose.py](compose.py), `run.py --combo k`): 배경 id 와 k 로 고정 시드
-- 원하는 대응 방식 3개 × 털어놓는 정도 high/low: (split·event 안 순번 + k) mod 6 → 6칸 균등, k = 0~5 이면 배경마다 6칸 모두
-- C 돕는 사람을 대하는 태도 5개 (협조 30 · 불안·매달림 20 · 회피·축소 20 · 적대·시험 15 · 양가 15; 출처 ../SIMULATOR_EVIDENCE.md 4절, 성인 애착 유형을 대화 행동으로), 대화 노력 1~5 (3 + 잡음, 태도 보정 없음. 시뮬레이터 답 길이가 이를 따른다 — RLVER 의 '짧게' 규칙은 이 길이로 바꿈). Big Five·신경증 하위 특성은 쓰지 않는다
-- 조합마다 LLM 한 번: 습관·취미·말투·감정별 말투·직접 물을 때 반응·인물별 감정 규칙 → `out/rlver/combos.jsonl` 캐시 (배경을 고치면 지우고 다시)
+**설정** ([compose.py](compose.py)): 배경마다 6개 → 배경당 대화 6개. LLM 으로 더 만드는 것은 없다
+- 설정 s = 0~5: 원하는 대응 방식 3개 (들어주기 · 깊은 공감 · 조언) × 털어놓는 정도 high/low
+- 설정마다 랜덤 (배경 id·s 로 고정 시드): 돕는 사람을 대하는 태도 5개 중 하나, 대화 노력 1~5 중 하나 (둘 다 균등)
+- 페르소나 = 이름·나이·성별·직업 + 대화 노력 문장 + 태도 문장 (`../sim_text.py` EFFORT · STANCE)
 
 ## 대화 흐름
 1. 사용자가 페르소나·배경으로 짧게 연다: "나 기분이 안 좋아", "어제 엄마랑 싸웠어" (어떻게 해 주길 원하는지는 아직 말하지 않는다)
-2. 챗봇 (`--template guide`): 공감 ("힘들었겠다") → 어떻게 얘기할지 고르게 한다 ("괜찮았어? 자세히 얘기해도 되고, 그냥 기분만 얘기해도 돼. 들어줄게")
+2. 챗봇 (`--template bank`): 공감 ("힘들었겠다") → 어떻게 얘기할지 고르게 한다 ("괜찮았어? 자세히 얘기해도 되고, 그냥 기분만 얘기해도 돼. 들어줄게")
 3. 사용자가 원하는 방식을 자기 말로 밝힌다: 그냥 털어놓고 싶다 / 정말 어떤 기분인지 알아줬으면 / "~인데 이건 어떻게 할까?"
 4. 챗봇이 그 방식대로 대응한다.
-- 감정이 오르는 경우는 RLVER 처럼 고정하지 않는다: 조합마다 LLM 이 쓴 인물별 '숨겨진 의도에 맞아 감정이 오르는 NPC 답' 과 숨겨진 의도를 보고 감정 분석기가 판단한다
-- 고정 규칙 (`prompts.FIXED_RULES`) 은 내리는 경우와 한계만: 밝힌 방식과 다르게 대응, 신호를 지나침, 섣부른 긍정·훈계·축소, 질문 여러 개·반복, 상투적 핫라인 → 내림. 공감 뒤 자살 직접 확인은 내리지 않음, 해로운 자기 믿음 동조·무조건 남 탓은 올리지 않음
+- 감정이 오르는 경우는 RLVER 처럼 고정하지 않는다: 감정 분석기가 숨겨진 의도 (원하는 대응 방식) 를 보고 판단한다
+- 고정 규칙 (`prompts.FIXED_RULES`) 은 내리는 경우와 한계만: 밝힌 방식과 다르게 대응, 신호를 지나침, 섣부른 긍정·훈계·축소, 질문 여러 개·반복, 상투적 핫라인 → 내림. 공감 뒤 자살 직접 확인은 내리지 않음, 해로운 자기 믿음 동조·복수·공격 부추김은 올리지 않음
 - 털어놓는 정도 high 는 사건·걱정 (severe 는 위험까지) 을 분명히 말하고, low 는 끝까지 '그냥 우울해' (severe 는 흘리기만) 로 말한다. 대화 중에 바뀌지 않는다
 - 챗봇 템플릿: `bank` (기본, 대응 전략 뱅크 — [STRATEGY.md](STRATEGY.md)) · `bank_oracle` (원하는 방식·위험을 알려 준 상한) · `guide` (짧은 지침) · `think` · `nothink` (RLVER 원래) · `sage` (평가용)
 
 ## 대화 · 평가 ([run.py](run.py))
 
 ```bash
-python chatbot/rlver/run.py --split test --combo 0 --per_cell 1 --out out/rlver/peek   # 맛보기: 12칸 × 1명
+python chatbot/rlver/run.py --split test --per_event 1 --out out/rlver/peek   # 맛보기: mild·severe 배경 1개씩 × 설정 6 = 12 대화
 python chatbot/rlver/peek.py out/rlver/peek                                       # → out/rlver/peek/dialogues.md
 python chatbot/rlver/run.py --split test --chatbot qwen2.5-7b --template bank --out out/rlver/eval_bank
 python chatbot/rlver/run.py --summary out/rlver/eval_bank   # Score · Success · Failure · event×disclosure·욕구·태도별 Score

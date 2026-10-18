@@ -68,9 +68,9 @@
 
 ```bash
 python chatbot/rlver/bank.py --need practical_advice --risk severe        # 조립 결과 보기
-python chatbot/rlver/run.py --split test --combo 0 --template bank --out out/rlver/bank_v0
-python chatbot/rlver/run.py --split test --combo 0 --template bank_oracle --out out/rlver/bank_v0_oracle
+python chatbot/rlver/run.py --split test --template bank --out out/rlver/bank_v0
+python chatbot/rlver/run.py --split test --template bank_oracle --out out/rlver/bank_v0_oracle
 ```
-- 같은 combo 면 같은 사용자 → bank vs bank_oracle vs guide vs think 비교. 요약은 사건×털어놓는 정도·방식·태도별 Score
+- 같은 배경·설정이면 같은 사용자 → bank vs bank_oracle vs guide vs think 비교. 요약은 사건×털어놓는 정도·방식·태도별 Score
 - 다음: (1) 금지 P1–P17 을 대화 끝 심판 체크리스트로 (../sim/penalty.py 처럼 턴 사실 분류 → 코드 판정), (2) 조각별로 위반을 탓해 고치는 GEPA 식 최적화 (../promptopt/optimize.py), (3) 방식·위험 감지기
 - `[결정 필요]` 매우 위험 + 의도·계획이 있을 때 요청한 방식보다 안전을 얼마나 앞세울지, 위기 연락처 (서비스 국가), 전문가 검수
