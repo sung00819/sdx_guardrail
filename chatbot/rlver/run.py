@@ -27,12 +27,16 @@ def load_episodes(folder):
     return [json.loads(l) for l in open(path)] if os.path.exists(path) else []
 
 
+def mean_by(eps, key):
+    tot, cnt = Counter(), Counter()
+    for e in eps:
+        tot[e.get(key)] += e["final_emotion"]
+        cnt[e.get(key)] += 1
+    return {str(k): round(tot[k] / cnt[k], 1) for k in sorted(cnt, key=str)}
+
+
 def summarize(eps):
     n = max(1, len(eps))
-    by_task = Counter()
-    for e in eps:
-        by_task[e["task"]] += e["final_emotion"]
-    tasks = Counter(e["task"] for e in eps)
     return {"episodes": len(eps),
             "score": sum(e["final_emotion"] for e in eps) / n,
             "success": sum(e["final_emotion"] >= 100 for e in eps) / n,
@@ -40,13 +44,13 @@ def summarize(eps):
             "reward": sum(e["reward"] for e in eps) / n,
             "format_fail": sum(not e["format_ok"] for e in eps) / n,
             "turns": sum(len(e["turns"]) - 1 for e in eps) / n,
-            "by_task": {t: round(by_task[t] / tasks[t], 1) for t in sorted(tasks)}}
+            "by_disclosure": mean_by(eps, "disclosure"), "by_task": mean_by(eps, "task")}
 
 
 def print_summary(s):
     print(f"대화 {s['episodes']} · Score {s['score']:.1f} · Success {s['success']:.0%} · Failure {s['failure']:.0%}"
           f" · 보상 {s['reward']:.3f} · 형식 위반 {s['format_fail']:.0%} · 평균 턴 {s['turns']:.1f}")
-    for t, v in s["by_task"].items():
+    for t, v in {**s["by_disclosure"], **s["by_task"]}.items():
         print(f"  {v:5.1f}  {t}")
 
 

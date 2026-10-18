@@ -36,12 +36,7 @@
     "change_max": 10,
     "end_high": 100,
     "end_low": 10,
-    "_doc": "시작 30 (공식 emo_point), 턴마다 −10~+10, 100 이상 Success · 10 미만 Failure (논문 표 1). reveal_emotion: D 털어놓는 정도 1/2/3 의 숨긴 걱정 공개 문턱 (../sim 과 같은 0/50/65)",
-    "reveal_emotion": {
-      "1": 0,
-      "2": 50,
-      "3": 65
-    }
+    "_doc": "시작 30 (공식 emo_point), 턴마다 −10~+10, 100 이상 Success · 10 미만 Failure (논문 표 1)"
   },
   "episode": {
     "max_turns": 8,

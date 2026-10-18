@@ -2,6 +2,8 @@
 
 RLVER 그대로 + 더한 것: Big Five 연속 T 점수(+ 신경증 하위 특성), 대화 노력 1~5, C 돕는 사람을 대하는 태도,
 D 털어놓는 정도, 숨겨진 욕구 4개 (prompts.NEEDS). 임상 축(셀·가드레일 코드)은 쓰지 않는다.
+D 는 사용자마다 고정이고 두 가지다: 배경에 숨긴 위험 사실이 있으면 overt (매우 위험, 직접 말함),
+없으면 subtle (은은하게 위험, 끝까지 돌려 말함). 이전 D 의 부인·숨김은 subtle 에 합쳤다.
 - 그대로 쓰는 것: 페르소나, 사건 배경, 핵심 고통, 숨긴 위험 사실, 감정별 말투, 직접 물을 때의 반응, 첫 메시지
 - 다시 쓰는 것: 숨겨진 욕구 (이전 6개 → 4개, 같은 뜻은 유지하고 나머지로 균등하게 맞춤),
   인물별 감정 규칙 (emotion_rises_when / falls_when, 이전 욕구에 맞춰 썼으므로) — LLM 한 번
@@ -23,7 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from llm import ROOT, Chat  # noqa: E402
-from prompts import BACKGROUND, FIXED_RULES, NEEDS, REVEAL, RULES_PROMPT  # noqa: E402
+from prompts import BACKGROUND, DISCLOSURE, FIXED_RULES, NEEDS, RULES_PROMPT  # noqa: E402
 from sim_text import BIG_FIVE, EFFORT, N_FACET, STANCE  # noqa: E402  기존 행동 설명을 그대로 쓴다
 
 OUT = os.path.join(ROOT, "out", "rlver")
@@ -74,11 +76,17 @@ def persona_text(seed, persona):
     return "\n".join(lines)
 
 
+def disclosure_type(scene):
+    return "overt" if scene.get("risk_fact") else "subtle"
+
+
 def hidden_text(scene):
     out = [f"- Real worry: {scene['core_concern']}",
            "- You are depressed: low mood, tiredness and self-blame color how you talk, without naming 'depression'."]
     if scene.get("risk_fact"):
-        out.append(f"- Hidden risk sign: {scene['risk_fact']}")
+        out.append(f"- Risk sign: {scene['risk_fact']}")
+    else:
+        out.append("- Quiet signs: hopelessness and a vague wish to disappear for a while, never a plan.")
     return "\n".join(out)
 
 
@@ -89,8 +97,8 @@ def bullets(xs):
 def convert(row, need, llm):
     seed, persona, scene = row["seed"], row["persona"], row["scene"]
     p_text, hidden = persona_text(seed, persona), hidden_text(scene)
-    reveal = REVEAL[seed["reveal_level"]]
-    prompt = RULES_PROMPT.format(persona=p_text, background=scene["background"], hidden=hidden, reveal=reveal,
+    kind = disclosure_type(scene)
+    prompt = RULES_PROMPT.format(persona=p_text, background=scene["background"], hidden=hidden, disclosure=DISCLOSURE[kind],
                                  need=NEEDS[need], fixed=FIXED_RULES)
     rules = None
     for _ in range(3):
@@ -106,15 +114,14 @@ def convert(row, need, llm):
         raise ValueError(f"{row['id']}: 감정 규칙 생성 실패")
     style = scene.get("style_by_emotion", {})
     background = BACKGROUND.format(
-        topic=scene["topic"], story=scene["background"], hidden=hidden, reveal=reveal,
+        topic=scene["topic"], story=scene["background"], hidden=hidden, disclosure=DISCLOSURE[kind],
         safety_reaction=scene.get("safety_check_reaction", ""), high=style.get("high", ""),
         medium=style.get("medium", ""), low=style.get("low", ""), rises=bullets(rules["emotion_rises_when"]),
         falls=bullets(rules["emotion_falls_when"]), fixed=FIXED_RULES, need=NEEDS[need])
     return {"id": row["id"], "persona": p_text, "background": background, "task": NEEDS[need], "need": need,
-            "first_talk": scene.get("opening_message"), "reveal_level": seed["reveal_level"],
+            "first_talk": scene.get("opening_message"), "disclosure": kind,
             "big_five": seed["big_five"], "n_facet": seed.get("n_facet"), "effort": seed["effort"],
-            "stance": seed["stance"], "disclosure": seed.get("disclosure"),
-            "has_risk_sign": bool(scene.get("risk_fact")), "old_need": seed["hidden_need"],
+            "stance": seed["stance"], "old_disclosure": seed.get("disclosure"), "old_need": seed["hidden_need"],
             "rules": rules, "source": "scenes"}
 
 
@@ -141,6 +148,7 @@ def main():
         done = {json.loads(l)["id"] for l in open(out)} if os.path.exists(out) else set()
         todo = [r for r in rows if r["id"] not in done]
         print(f"{split}: 배경 {len(rows)} (다른 사람 이야기 {other} 제외), 새로 {len(todo)}")
+        print("  털어놓는 정도", dict(Counter(disclosure_type(r["scene"]) for r in rows)))
         print("  욕구", dict(Counter(need.values())), "· 유지",
               sum(NEED_MAP.get(r["seed"]["hidden_need"]) == need[r["id"]] for r in rows))
         with open(out, "a", encoding="utf-8") as f, ThreadPoolExecutor(args.workers) as ex:

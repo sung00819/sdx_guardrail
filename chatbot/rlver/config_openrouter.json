@@ -21,12 +21,7 @@
     "change_min": -10,
     "change_max": 10,
     "end_high": 100,
-    "end_low": 10,
-    "reveal_emotion": {
-      "1": 0,
-      "2": 50,
-      "3": 65
-    }
+    "end_low": 10
   },
   "episode": {
     "max_turns": 8
