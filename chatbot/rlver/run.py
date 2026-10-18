@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from backgrounds import OUT as BACKGROUNDS, read  # noqa: E402
-from compose import Combos  # noqa: E402
+from compose import Combos, assign_rank  # noqa: E402
 from episode import run_episode  # noqa: E402
 from llm import ROOT, Chat  # noqa: E402
 
@@ -72,7 +72,8 @@ def main():
     ap.add_argument("--chatbot", default="qwen2.5-7b", help="config chatbots 의 이름")
     ap.add_argument("--model", help="챗봇 model 이름을 바꾼다 (vLLM 런타임 LoRA 어댑터 이름)")
     ap.add_argument("--temperature", type=float)
-    ap.add_argument("--template", choices=["think", "nothink", "sage"], default="think")
+    ap.add_argument("--template", choices=["guide", "think", "nothink", "sage"], default="guide",
+                    help="guide = think + 공감·자율성·고른 방식대로 지침, think·nothink = RLVER 원래 템플릿")
     ap.add_argument("--samples", type=int, default=1, help="프로필마다 대화 수 (GRPO 그룹 크기)")
     ap.add_argument("--no_first_talk", action="store_true", help="테스트 프로필의 고정 첫 발화 대신 시뮬레이터가 연다")
     ap.add_argument("--workers", type=int, default=32)
@@ -93,7 +94,10 @@ def main():
     if args.profiles:
         profiles = [json.loads(l) for l in open(args.profiles)]
     else:
-        profiles = [r for r in read(args.backgrounds) if r["split"] == args.split]
+        bgs = read(args.backgrounds)
+        for r in bgs:  # Numbers·Excel 이 숫자처럼 보이는 id 를 '44678179.0' 으로 바꾼 경우
+            r["id"] = r["id"][:-2] if r["id"].endswith(".0") else r["id"]
+        profiles = [r for r in assign_rank(bgs) if r["split"] == args.split]
     if args.ids:
         keep = [l.strip() for l in open(args.ids) if l.strip()]
         by = {p["id"]: p for p in profiles}

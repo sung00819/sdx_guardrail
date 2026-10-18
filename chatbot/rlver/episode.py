@@ -14,7 +14,7 @@ THINK = re.compile(r"\A\s*<think>(.+?)</think>\s*(\S.*)\Z", re.S)
 
 def parse_bot(raw, template):
     """→ (사용자에게 보일 답, 형식 맞음). 형식이 틀려도 대화는 이어 간다 (공식 extract_content: 마지막 </think> 뒤)"""
-    if template != "think":
+    if template not in ("think", "guide"):
         reply = re.sub(r"<think>.*?</think>", "", raw, flags=re.S).strip()
         return reply, "<think>" not in raw
     m = THINK.match(raw)
@@ -48,7 +48,7 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
             break
     format_ok = all(t.get("format_ok", True) for t in turns)
     reward = max(user.emotion, 0) / 100
-    if template == "think" and cfg["reward"].get("format_zero", True) and not format_ok:
+    if template in ("think", "guide") and cfg["reward"].get("format_zero", True) and not format_ok:
         reward = 0.0
     return {"id": profile["id"], "task": profile.get("task"), "event": profile.get("event"), "disclosure": profile.get("disclosure"),
             "template": template, "turns": turns,

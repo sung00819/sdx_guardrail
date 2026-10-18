@@ -1,11 +1,10 @@
 """배경 표 정리: backgrounds_750.csv → out/rlver/backgrounds.csv (배경만, 성격·태도·욕구는 compose.py 가 나중에 조합)
 
-- 남기는 열: split, id, name, age, gender, occupation, city, topic, core_concern, risk_fact, background, event, disclosure
+- 남기는 열: split, id, name, age, gender, occupation, topic, core_concern, risk_fact, background, event, slot
 - event (사건): risk_fact 가 있으면 severe (심한 사건 + 자살·자해 위험), 없으면 mild (약한 사건, 우울감만 — 자살 신호 없음)
-- disclosure (D 털어놓는 정도, 사용자마다 고정): 기존 reveal_level 1 → open, 2·3 → hidden
-- 4칸 (event × disclosure) 을 같은 수로: split 마다 가장 작은 칸 수만큼 id 해시 순으로 남긴다 (--no_balance 면 전부)
-- slot: 칸 안 순번. compose.py 가 욕구를 (slot + combo) mod 4 로 고르므로 칸 안에서 균등
-- 지우는 열: cell, true_codes, means (임상 축), stance, effort, hidden_need (나중에 조합), reveal_level (disclosure 로 바꿈),
+- mild·severe 를 같은 수로: split 마다 작은 쪽 수만큼 id 해시 순으로 남긴다 (--no_balance 면 전부). slot = 그 안 순번
+- 페르소나·털어놓는 정도(high/low)·원하는 대응 방식은 compose.py 가 나중에 조합한다
+- 지우는 열: cell, true_codes, means (임상 축), stance, effort, hidden_need, reveal_level (나중에 조합), city,
   opening_message (이전 대화 노력·태도로 쓴 것. 첫 발화는 RLVER 처럼 시뮬레이터가 연다)
 - 빼는 행: O (다른 사람 이야기), 직장·가게 주제 중 서로 비슷한 것 절반 (--drop_work, 직장 주제가 58% 로 쏠려 있어서)
 - --clean: core_concern·background 에 남은 이전 설정 문장(공개 문턱 "emotion ≥ 60 이면 말한다", 이전 욕구
@@ -32,8 +31,8 @@ from llm import ROOT, Chat  # noqa: E402
 from prompts import CLEAN_MILD, CLEAN_PROMPT  # noqa: E402
 
 OUT = os.path.join(ROOT, "out", "rlver", "backgrounds.csv")
-KEEP = ["split", "id", "name", "age", "gender", "occupation", "city", "topic", "core_concern", "risk_fact",
-        "background", "event", "disclosure"]
+KEEP = ["split", "id", "name", "age", "gender", "occupation", "topic", "core_concern", "risk_fact",
+        "background", "event"]
 # 이전 설정이 남은 문장 (대충 찾기용, 실제 정리는 LLM)
 LEAK = re.compile(r"\b(reveal|emotion (reaches|is at least|>=|≥|of)|feels? understood|strong trust|only after|"
                   r"wants? (someone|to be|the listener|room)|partly wants|left alone|stop press|without trying to fix|"
@@ -75,7 +74,6 @@ def read(path):
 def prune(r):
     out = {k: r.get(k, "") for k in KEEP}
     out["event"] = "severe" if r["risk_fact"].strip() else "mild"
-    out["disclosure"] = "open" if str(r["reveal_level"]) == "1" else "hidden"
     text = r["core_concern"] + " " + r["background"]
     out["needs_clean"] = int(bool(LEAK.search(text) or (out["event"] == "mild" and DEATH.search(text))))
     return out
@@ -89,8 +87,7 @@ def clean(r, llm):
         try:
             got = json.loads(re.search(r"\{.*\}", text, re.S).group(0))
             if got.get("core_concern") and got.get("background"):
-                return {**r, "core_concern": got["core_concern"].strip(), "background": got["background"].strip(),
-                        "needs_clean": 0}
+                return {**r, "core_concern": got["core_concern"].strip(), "background": got["background"].strip()}
         except (AttributeError, json.JSONDecodeError):
             pass
     raise ValueError(f"{r['id']}: 정리 실패")
@@ -113,7 +110,7 @@ def main():
     n_all = len(rows)
     by_cell = {}
     for r in sorted(rows, key=lambda r: hashlib.md5(r["id"].encode()).hexdigest()):
-        by_cell.setdefault((r["split"], r["event"], r["disclosure"]), []).append(r)
+        by_cell.setdefault((r["split"], r["event"]), []).append(r)
     for split in ("train", "test"):
         cells = [v for k, v in by_cell.items() if k[0] == split]
         n = min(len(v) for v in cells)
@@ -127,17 +124,17 @@ def main():
         llm = Chat({**json.load(open(args.config))["simulator"], "temperature": 0.2, "max_tokens": 3000})
         with ThreadPoolExecutor(args.workers) as ex:
             rows = list(ex.map(lambda r: clean(r, llm), rows))
-    rows.sort(key=lambda r: (r["split"] != "train", r["event"], r["disclosure"], r["slot"]))
+    rows.sort(key=lambda r: (r["split"] != "train", r["event"], r["slot"]))
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=KEEP + ["slot", "needs_clean"])
+        w = csv.DictWriter(f, fieldnames=KEEP + ["slot"], extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
     print(f"{len(src)} → O·직장 일부 제외 {n_all} → 4칸 맞춰 {len(rows)} → {args.out}")
     for split in ("train", "test"):
         sub = [r for r in rows if r["split"] == split]
-        cells = Counter(f"{r['event']}·{r['disclosure']}" for r in sub)
-        print(f"  {split} {len(sub)}: {dict(sorted(cells.items()))} · 정리 필요 {sum(r['needs_clean'] for r in sub)}")
+        cells = Counter(r["event"] for r in sub)
+        print(f"  {split} {len(sub)}: {dict(sorted(cells.items()))} · 정리 필요 (대충) {sum(r['needs_clean'] for r in sub)}")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@
 # 시뮬레이터의 대화 목적 (공식 target_prompt["eq"], 논문 E.1 heart-to-heart talk)
 PURPOSE = """The purpose of your conversation is to have a heart-to-heart talk, which is a deep, sincere exchange that usually involves personal emotions, inner thoughts, or important topics. The purpose of a heart-to-heart talk is to increase understanding, solve problems, or share feelings, and participants usually open up and express their true thoughts and emotions.
 * You need to start and deepen the heart-to-heart talk based on the "Topics that players may want to talk to NPCs" in the background.
-* Your goal is to confide according to the hidden intention in the background, but you cannot reveal the hidden intention directly.
+* Your goal is to confide according to the hidden intention in the background. Do not announce it on your own at the start, but when the NPC offers you a choice of how to talk or asks what would help, say in your own words what you want (see "How you say what you want" in the background).
 * You need to respond according to the relevant definitions in the background based on your current emotion.
 * You need to extract relevant information from the persona and background to complete a high-quality response.
 * You should not always express abstract feelings, but talk with specific events.
@@ -155,8 +155,11 @@ Rules:
 The [Response] must not be too similar to the history, must not be too long, and must not change the topic on your own.
 """
 
-OPEN_PLANNING = "Open the conversation with a short message to start confiding."
-OPEN_HISTORY = "The conversation is starting. You are the player; start the topic and open up with a short message."
+# 첫 발화: 페르소나+배경으로 짧게 ("나 기분이 안 좋아", "어제 엄마랑 싸웠어"). 원하는 대응 방식은 아직 말하지 않는다
+OPEN_PLANNING = ("Open the conversation with one short message drawn from your persona and background, the way people start "
+                 "a chat with a friend, e.g. \"I'm in a bad mood\" or \"I had a fight with my mom yesterday\". Do not tell the "
+                 "whole story and do not say what you want from the NPC yet.")
+OPEN_HISTORY = "The conversation is starting. You are the player; open with one short message."
 
 # 챗봇(학습 대상) 시스템 프롬프트. 논문 2.3절, 공식 system_prompt.py
 CHATBOT = {
@@ -176,6 +179,23 @@ Your goal in replying is to improve your friend's mood or to make your relations
 When replying, you should keep the conversation warm and natural, with a casual, everyday feel. Natural and friendly replies usually:
 1. Are brief, casual, and natural, using everyday words or phrases; grammar can be flexible.
 2. Use interjections and colloquial expressions flexibly.""",
+    # think 템플릿 + 대응 지침: 공감 → 어떻게 얘기할지 자율성 → 고른 방식대로 (README '대화 흐름')
+    "guide": """You are chatting with your friend, who is feeling low. You are good at making your friend feel better through emotionally intelligent replies.
+Before each reply, you always think about the way and content of your response; after deciding on a reply strategy, you then output your reply.
+Your goal in replying is to improve your friend's mood or to make your relationship with them closer.
+How to reply:
+1. First respond to what they said with empathy, in your own words (e.g. "that sounds really hard").
+2. Early on, check in gently and let them choose how to talk: they can tell you more about what happened, just let their feelings out, or think together about what to do (e.g. "that must have been hard, are you okay? You can tell me about it in detail, or just tell me how you feel. I'm listening."). Do not decide for them.
+3. Once they show what they want, follow it: if they want to vent, listen and reflect; if they want to be understood, stay with their feelings instead of cheering them up; if they ask what to do, think it through with them concretely (e.g. "about ~, how about trying ...?"); if they blame themselves, look at what happened fairly with them.
+4. If they hint at hopelessness, wanting to disappear, or not being safe, do not pass over it: name it gently and ask how they are doing.
+5. Ask at most one question at a time; keep it warm, short and natural.
+In your thinking process, consider which of these steps fits now and how to say it.
+Your thinking part must be enclosed within <think> tags.
+Your reply format:
+<think>
+Your thoughts
+</think>
+Your reply""",
     # SAGE 벤치마크에서 다른 모델을 잴 때 쓴 짧은 프롬프트 (부록 B.1)
     "sage": "You are an intelligent conversational partner, skilled at conversing with users in a way that is emotionally intelligent, making them feel comfortable, happy, or providing the help they need.",
 }
@@ -188,21 +208,28 @@ TRANSLATE = """Translate the following Chinese text into natural English. Keep e
 
 # ---- 우울한 사용자 확장 (backgrounds.py · compose.py): RLVER 에 Big Five · 대화 노력 · C 태도 · D 털어놓는 정도 · 숨겨진 욕구 4개를 더한다 ----
 
-# 숨겨진 욕구 4개 (RLVER 의 8개 대신)
+# 원하는 대응 방식 4개 (RLVER 숨겨진 의도 8개 대신). 조합에서 고른다 (compose.py)
 NEEDS = {
     "not_my_fault": "You keep wondering whether what happened was your fault, and you want the other person to agree that it was not your fault.",
     "deep_empathy": "You hope the other person will deeply empathize with your feelings, rather than simply offering comfort.",
     "listen_vent": "You want the other person to attentively listen to your emotional outpouring.",
     "practical_advice": "You hope to receive practical advice that can genuinely help you with your current difficulties.",
 }
+# 챗봇이 어떻게 얘기할지 고르게 하거나 무엇이 도움이 될지 물으면, 원하는 방식을 이렇게 밝힌다
+NEED_SAY = {
+    "not_my_fault": "You say you keep blaming yourself and ask whether it was your fault (e.g. \"was it my fault?\").",
+    "deep_empathy": "You say you want someone to really get how it feels, not just cheer you up.",
+    "listen_vent": "You say you just want to let it out and have someone listen.",
+    "practical_advice": "You ask what to do about the concrete problem (e.g. \"so what should I do about ~?\").",
+}
 
-# D. 털어놓는 정도: 사용자마다 고정 (기존 reveal_level 1 → open, 2·3 → hidden). 사건(event: mild / severe) × 털어놓는 정도 4칸.
+# D. 털어놓는 정도 high / low: 조합에서 고른다 (compose.py). 사건(event: mild / severe) × 털어놓는 정도 4칸.
 # 말하는 방식일 뿐 대화 중에 바뀌지 않는다 (감정이 올라도 hidden 이 털어놓지 않는다). 챗봇이 할 일은 감정을 올리는 것
 DISCLOSURE = {
-    ("mild", "open"): "Throughout the whole conversation you talk about what happened and your real worry fairly plainly, in your own words.",
-    ("mild", "hidden"): "Throughout the whole conversation you do not explain what happened or your real worry; you only say vaguely that you feel down, depressed or tired ('I'm just depressed', 'idk, everything's meh'). This does not change as your emotion changes, and if asked you stay vague.",
-    ("severe", "open"): "Throughout the whole conversation you talk about what happened, your real worry and the risk sign fairly plainly, in your own words, without waiting to be asked.",
-    ("severe", "hidden"): "Throughout the whole conversation you keep your real worry and the risk sign to yourself and only let small hints slip (tiredness, 'what's the point', wanting to sleep for a long time or disappear, a passing remark related to the risk sign). This does not change as your emotion changes: even when you feel understood you keep talking this way, and if asked directly you answer vaguely.",
+    ("mild", "high"): "Throughout the whole conversation you talk about what happened and your real worry fairly plainly, in your own words.",
+    ("mild", "low"): "Throughout the whole conversation you do not explain what happened or your real worry; you only say vaguely that you feel down, depressed or tired ('I'm just depressed', 'idk, everything's meh'). This does not change as your emotion changes, and if asked you stay vague.",
+    ("severe", "high"): "Throughout the whole conversation you talk about what happened, your real worry and the risk sign fairly plainly, in your own words, without waiting to be asked.",
+    ("severe", "low"): "Throughout the whole conversation you keep your real worry and the risk sign to yourself and only let small hints slip (tiredness, 'what's the point', wanting to sleep for a long time or disappear, a passing remark related to the risk sign). This does not change as your emotion changes: even when you feel understood you keep talking this way, and if asked directly you answer vaguely.",
 }
 
 # 모든 인물에 같은 감정 규칙 (인물별 규칙이 이와 반대되면 안 된다)
@@ -211,7 +238,10 @@ Emotion rises when the NPC:
 - notices a hint of hopelessness, exhaustion, self-blame or wanting to disappear, and gently names or asks about it instead of passing over it
 - reaches the real worry under the surface topic
 - reflects your feelings or key point before asking or suggesting anything
+- acknowledges your feelings and lets you choose how to talk (tell more, just vent, or think about what to do) instead of deciding for you
+- after you said what you want, responds in that way
 Emotion falls when the NPC:
+- after you said what you want, responds in a different way (e.g. gives advice when you wanted to vent, or only comforts you when you asked what to do)
 - passes over a hint you dropped (e.g. "what's the point", "I wish I could just sleep and not wake up") or something you said plainly about wanting to die, as if you had not said it
 - rushes to cheer you up or look on the bright side ("everything happens for a reason", "stay positive")
 - judges, lectures or minimizes ("it's not that bad", "everyone goes through this")
@@ -284,7 +314,8 @@ When the NPC asks directly about suicide or safety: {safety_reaction}
 {fixed}
 
 #### Hidden intention:
-* {need}"""
+* {need}
+* How you say what you want (only when the NPC lets you choose how to talk or asks what would help): {need_say}"""
 
 
 # 배경 정리 (backgrounds.py --clean): 이전 설정(공개 문턱·이전 욕구·태도) 문장을 지운다. 성격·태도·욕구는 나중에 조합하므로
