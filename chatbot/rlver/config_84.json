@@ -1,0 +1,56 @@
+{
+  "_doc": "84번 서버 안에서 돌리는 설정 (../promptopt config_po.json 과 같은 서버). 시뮬레이터 = 84번 30B 세 대 + 54번 세 대 (터널), 챗봇 = 84번 GPU 2 Qwen3-8B (18602) 또는 30B",
+  "simulator": {
+    "base_url": [
+      "http://localhost:18601/v1",
+      "http://localhost:18603/v1",
+      "http://localhost:18604/v1",
+      "http://localhost:18611/v1",
+      "http://localhost:18612/v1",
+      "http://localhost:18613/v1"
+    ],
+    "model": "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
+    "temperature": 0.5,
+    "max_tokens": 2000,
+    "_doc": "논문은 DeepSeek-V3. 온도 0.5 는 공식 코드"
+  },
+  "chatbots": {
+    "qwen3-8b": {
+      "base_url": "http://localhost:18602/v1",
+      "model": "Qwen/Qwen3-8B",
+      "temperature": 0.7,
+      "max_tokens": 1500,
+      "disable_thinking": true,
+      "_doc": "모델 자체 생각 모드는 끄고 think 는 프롬프트로"
+    },
+    "qwen30b": {
+      "base_url": [
+        "http://localhost:18601/v1",
+        "http://localhost:18603/v1",
+        "http://localhost:18604/v1",
+        "http://localhost:18611/v1",
+        "http://localhost:18612/v1",
+        "http://localhost:18613/v1"
+      ],
+      "model": "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
+      "temperature": 0.7,
+      "max_tokens": 1500
+    }
+  },
+  "emotion": {
+    "start": 30,
+    "change_min": -10,
+    "change_max": 10,
+    "end_high": 100,
+    "end_low": 10,
+    "_doc": "시작 30 (공식 emo_point), 턴마다 −10~+10, 100 이상 Success · 10 미만 Failure (논문 표 1)"
+  },
+  "episode": {
+    "max_turns": 8,
+    "_doc": "부록 B.3 · 공식 max_turns=8 (본문 3.1절은 10)"
+  },
+  "reward": {
+    "format_zero": true,
+    "_doc": "r = max(e_T, 0)/100. think 템플릿에서 형식을 어긴 턴이 있으면 0"
+  }
+}

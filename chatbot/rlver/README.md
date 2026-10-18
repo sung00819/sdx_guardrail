@@ -43,7 +43,7 @@ python chatbot/rlver/peek.py out/rlver/peek                                     
 python chatbot/rlver/run.py --split test --chatbot qwen2.5-7b --template bank --out out/rlver/eval_bank
 python chatbot/rlver/run.py --summary out/rlver/eval_bank   # Score · Success · Failure · event×disclosure·욕구·태도별 Score
 ```
-서버 없이: `--config chatbot/rlver/config_openrouter.json` (시뮬레이터 DeepSeek-V3, 논문과 같음; `.env` 에 `OPENROUTER_API_KEY`).
+84번 서버 안에서: `--config chatbot/rlver/config_84.json --chatbot qwen3-8b` (또는 `qwen30b`). 서버 없이: `--config chatbot/rlver/config_openrouter.json` (시뮬레이터 DeepSeek-V3, 논문과 같음; `.env` 에 `OPENROUTER_API_KEY`).
 
 | 파일 | 하는 일 |
 |---|---|
