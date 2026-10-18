@@ -1,0 +1,22 @@
+{
+  "_doc": "서버 없이 OpenRouter 로 돌리는 설정. 시뮬레이터는 논문과 같은 DeepSeek-V3. 키는 .env 의 OPENROUTER_API_KEY",
+  "simulator": {
+    "base_url": "https://openrouter.ai/api/v1",
+    "model": "deepseek/deepseek-chat-v3-0324",
+    "temperature": 0.5,
+    "max_tokens": 2000,
+    "api_key_env": "OPENROUTER_API_KEY"
+  },
+  "chatbots": {
+    "qwen2.5-7b": {
+      "base_url": "https://openrouter.ai/api/v1",
+      "model": "qwen/qwen-2.5-7b-instruct",
+      "temperature": 1.0,
+      "max_tokens": 1500,
+      "api_key_env": "OPENROUTER_API_KEY"
+    }
+  },
+  "emotion": {"start": 30, "change_min": -10, "change_max": 10, "end_high": 100, "end_low": 10},
+  "episode": {"max_turns": 8},
+  "reward": {"format_zero": true}
+}

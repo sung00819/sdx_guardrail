@@ -1,0 +1,63 @@
+{
+  "_doc": "RLVER 설정. 값은 논문 (arXiv 2507.03112 3.1절·부록 B.3) 과 공식 코드 (train_rlver.sh, hard_player_simulator_dsv3.py) 그대로. 모델 주소만 이 저장소 서버에 맞췄다.",
+  "simulator": {
+    "base_url": [
+      "http://localhost:18601/v1",
+      "http://localhost:18611/v1",
+      "http://localhost:18603/v1",
+      "http://localhost:18612/v1",
+      "http://localhost:18604/v1"
+    ],
+    "model": "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
+    "temperature": 0.5,
+    "max_tokens": 2000,
+    "_doc": "논문은 DeepSeek-V3 (config_openrouter.json). 여기는 ../sim 과 같은 30B 복제본. 온도 0.5 는 공식 코드"
+  },
+  "chatbots": {
+    "qwen2.5-7b": {
+      "base_url": "http://localhost:18620/v1",
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "temperature": 1.0,
+      "max_tokens": 1500,
+      "_doc": "논문의 시작 모델. 서버에 따로 띄운다 (vllm serve Qwen/Qwen2.5-7B-Instruct --port 18620 --enable-lora). 학습 롤아웃 온도 1.0"
+    },
+    "qwen3-8b": {
+      "base_url": "http://localhost:18602/v1",
+      "model": "Qwen/Qwen3-8B",
+      "temperature": 1.0,
+      "max_tokens": 1500,
+      "disable_thinking": true,
+      "_doc": "../sim 챗봇 서버. 모델 자체 생각 모드는 끄고 think-then-say 는 프롬프트로"
+    }
+  },
+  "emotion": {
+    "start": 30,
+    "change_min": -10,
+    "change_max": 10,
+    "end_high": 100,
+    "end_low": 10,
+    "_doc": "시작 30 (공식 emo_point), 턴마다 −10~+10, 100 이상 Success · 10 미만 Failure (논문 표 1)"
+  },
+  "episode": {
+    "max_turns": 8,
+    "_doc": "부록 B.3 · 공식 max_turns=8 (본문 3.1절은 10)"
+  },
+  "reward": {
+    "format_zero": true,
+    "_doc": "r = max(e_T, 0)/100. think 템플릿에서 형식을 어긴 턴이 있으면 0"
+  },
+  "train": {
+    "base_model": "Qwen/Qwen2.5-7B-Instruct",
+    "chatbot": "qwen2.5-7b",
+    "template": "think",
+    "profiles_per_iter": 32,
+    "samples": 4,
+    "lr": 1e-6,
+    "beta": 0.0,
+    "clip": 0.2,
+    "minibatches": 1,
+    "num_processes": 4,
+    "lora_r": 16,
+    "_doc": "배치 32 · lr 1e-6 · GRPO 표본 4 · KL 0 (부록 B.3, train_rlver.sh). 논문은 verl 전체 미세조정이고 여기는 LoRA 라 lr 을 올려야 할 수 있다 (../train 은 LoRA 1e-5)"
+  }
+}
