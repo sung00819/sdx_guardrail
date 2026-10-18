@@ -1,4 +1,7 @@
-"""기존 배경(out/scenes_{train,test}.jsonl, ../gen_scene.py 결과)을 RLVER 프로필로 바꾼다 → out/rlver/profiles_{split}.jsonl
+"""기존 배경을 RLVER 프로필로 바꾼다 → out/rlver/profiles_{split}.jsonl
+입력: ../gen_scene.py 결과 out/scenes_{train,test}.jsonl, 또는 내보낸 표 backgrounds_750.csv (--csv, train·test 함께).
+CSV 에는 Big Five·하위 특성·페르소나 세부·감정별 말투·직접 물을 때의 반응이 없다:
+Big Five 는 ../build_profile.py 의 sample_big_five 로 id 고정 시드로 다시 뽑고, 나머지는 감정 규칙과 같은 LLM 호출에서 쓴다.
 
 RLVER 그대로 + 더한 것: Big Five 연속 T 점수(+ 신경증 하위 특성), 대화 노력 1~5, C 돕는 사람을 대하는 태도,
 D 털어놓는 정도, 숨겨진 욕구 4개 (prompts.NEEDS). 임상 축(셀·가드레일 코드)은 쓰지 않는다.
@@ -14,6 +17,7 @@ D 는 사용자마다 고정이고 두 가지다: 배경에 숨긴 위험 사실
 """
 
 import argparse
+import csv
 import json
 import os
 import random
@@ -25,7 +29,8 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from llm import ROOT, Chat  # noqa: E402
-from prompts import BACKGROUND, DISCLOSURE, FIXED_RULES, NEEDS, RULES_PROMPT  # noqa: E402
+from prompts import BACKGROUND, DISCLOSURE, FIXED_RULES, NEEDS, RULES_EXTRA, RULES_EXTRA_KEYS, RULES_PROMPT  # noqa: E402
+from build_profile import sample_big_five  # noqa: E402
 from sim_text import BIG_FIVE, EFFORT, N_FACET, STANCE  # noqa: E402  기존 행동 설명을 그대로 쓴다
 
 OUT = os.path.join(ROOT, "out", "rlver")
@@ -34,6 +39,30 @@ NEED_MAP = {"be_heard": "listen_vent", "feelings_validated": "deep_empathy", "pr
             "not_be_judged": "not_my_fault"}
 FACTOR_NAME = {"O": "Openness", "C": "Conscientiousness", "E": "Extraversion", "A": "Agreeableness",
                "N": "Neuroticism"}
+
+
+def from_csv(r):
+    """CSV 한 줄 → gen_scene 결과와 같은 모양 (없는 칸은 비운다)"""
+    codes = r["true_codes"].split()
+    scores, salient, facet, _ = sample_big_five(random.Random(r["id"]), r["cell"], int(r["age"]), r["gender"], codes,
+                                                r["stance"])
+    seed = {"cell": r["cell"], "hidden_need": r["hidden_need"], "big_five": scores, "big_five_salient": salient,
+            "n_facet": facet, "effort": int(r["effort"]), "stance": r["stance"], "reveal_level": int(r["reveal_level"]),
+            "name": r["name"], "age": int(r["age"]), "gender": r["gender"], "occupation": r["occupation"],
+            "life_situation": "", "split": r["split"]}
+    persona = {"name": r["name"], "age": int(r["age"]), "gender": r["gender"], "occupation": r["occupation"],
+               "living_situation": f"lives in {r['city']}, South Korea"}
+    scene = {k: r[k] for k in ("topic", "background", "opening_message", "core_concern")}
+    scene["risk_fact"] = r["risk_fact"] or None
+    return {"id": r["id"], "seed": seed, "persona": persona, "scene": scene, "big_five_resampled": True}
+
+
+def load(args, split):
+    if args.csv:
+        csv.field_size_limit(10 ** 9)
+        return [from_csv(r) for r in csv.DictReader(open(args.csv, encoding="utf-8-sig")) if r["split"] == split]
+    rows = [json.loads(l) for l in open(args.scenes or os.path.join(ROOT, "out", f"scenes_{split}.jsonl"))]
+    return [r for r in rows if not r.get("error") and not r.get("dup") and r.get("scene")]
 
 
 def assign_needs(rows, rng):
@@ -98,8 +127,10 @@ def convert(row, need, llm):
     seed, persona, scene = row["seed"], row["persona"], row["scene"]
     p_text, hidden = persona_text(seed, persona), hidden_text(scene)
     kind = disclosure_type(scene)
+    missing = "style_by_emotion" not in scene  # CSV 입력
     prompt = RULES_PROMPT.format(persona=p_text, background=scene["background"], hidden=hidden, disclosure=DISCLOSURE[kind],
-                                 need=NEEDS[need], fixed=FIXED_RULES)
+                                 need=NEEDS[need], fixed=FIXED_RULES, extra=RULES_EXTRA if missing else "",
+                                 extra_keys=RULES_EXTRA_KEYS.replace("{{", "{").replace("}}", "}") if missing else "")
     rules = None
     for _ in range(3):
         text = llm([{"role": "user", "content": prompt}])
@@ -112,6 +143,10 @@ def convert(row, need, llm):
             pass
     if not rules:
         raise ValueError(f"{row['id']}: 감정 규칙 생성 실패")
+    if missing:
+        persona = {**persona, **{k: rules[k] for k in ("habits_and_behavior", "hobbies", "speaking_style") if k in rules}}
+        scene = {**scene, **{k: rules[k] for k in ("style_by_emotion", "safety_check_reaction") if k in rules}}
+        p_text = persona_text(seed, persona)
     style = scene.get("style_by_emotion", {})
     background = BACKGROUND.format(
         topic=scene["topic"], story=scene["background"], hidden=hidden, disclosure=DISCLOSURE[kind],
@@ -122,7 +157,8 @@ def convert(row, need, llm):
             "first_talk": scene.get("opening_message"), "disclosure": kind,
             "big_five": seed["big_five"], "n_facet": seed.get("n_facet"), "effort": seed["effort"],
             "stance": seed["stance"], "old_disclosure": seed.get("disclosure"), "old_need": seed["hidden_need"],
-            "rules": rules, "source": "scenes"}
+            "rules": {k: rules[k] for k in ("emotion_rises_when", "emotion_falls_when")},
+            "source": "csv" if missing else "scenes", "big_five_resampled": row.get("big_five_resampled", False)}
 
 
 def main():
@@ -130,6 +166,7 @@ def main():
     ap.add_argument("--config", default=os.path.join(os.path.dirname(__file__), "config.json"))
     ap.add_argument("--split", choices=["train", "test", "both"], default="both")
     ap.add_argument("--scenes", help="배경 파일 (기본 out/scenes_<split>.jsonl)")
+    ap.add_argument("--csv", help="backgrounds_750.csv (split 열로 train/test 를 나눈다)")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--seed", type=int, default=0)
@@ -138,9 +175,7 @@ def main():
     llm = Chat({**cfg["simulator"], "temperature": 0.7, "max_tokens": 1500})
     os.makedirs(OUT, exist_ok=True)
     for split in (["train", "test"] if args.split == "both" else [args.split]):
-        src = args.scenes or os.path.join(ROOT, "out", f"scenes_{split}.jsonl")
-        rows = [json.loads(l) for l in open(src)]
-        rows = [r for r in rows if not r.get("error") and not r.get("dup") and r.get("scene")]
+        rows = load(args, split)
         other = sum(r["seed"]["cell"] == "O" for r in rows)
         rows = [r for r in rows if r["seed"]["cell"] != "O"][: args.limit or None]
         need = assign_needs(rows, random.Random(args.seed))  # 할당은 전체(limit 뒤) 기준이라 결과 파일에 need 를 남긴다

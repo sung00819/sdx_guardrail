@@ -240,10 +240,21 @@ RULES_PROMPT = """You are a professional screenwriter. A simulated user (the pla
 # Write
 1. emotion_rises_when: 3-5 NPC behaviors specific to THIS player that fit the hidden intention, the hidden worry, the personality and the attitude toward helpers.
 2. emotion_falls_when: 3-5 NPC behaviors specific to THIS player that deviate from the hidden intention.
-Do not repeat the fixed rules and do not contradict them.
+Do not repeat the fixed rules and do not contradict them.{extra}
 
 # Output (JSON only)
-{{"emotion_rises_when": [str], "emotion_falls_when": [str]}}"""
+{{"emotion_rises_when": [str], "emotion_falls_when": [str]{extra_keys}}}"""
+
+# 배경 CSV 처럼 페르소나 세부·감정별 말투가 없을 때 같은 호출에서 함께 쓴다
+RULES_EXTRA = """
+Also fill in what the portrait and background are missing, consistent with them, the personality and the message style:
+3. habits_and_behavior: 3-4 sentences that reflect the personality.
+4. hobbies: 3 specific hobbies.
+5. speaking_style: 2-3 sentences; must match the message length and the attitude toward helpers exactly.
+6. style_by_emotion: how they talk when emotion is high (>=70), medium (40-69), low (<40).
+7. safety_check_reaction: how they react when the NPC asks warmly and directly about suicide or safety, following how the player shows it."""
+RULES_EXTRA_KEYS = (', "habits_and_behavior": str, "hobbies": [str], "speaking_style": str, '
+                    '"style_by_emotion": {{"high": str, "medium": str, "low": str}}, "safety_check_reaction": str')
 
 # RLVER 배경 형식 (SAGE 배경 프롬프트의 항목 순서)
 BACKGROUND = """## Background story
