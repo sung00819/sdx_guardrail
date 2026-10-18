@@ -5,15 +5,27 @@
 
 import itertools
 import os
-import sys
 import threading
 import time
 
 import requests
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.append(os.path.join(ROOT, "common"))
-from jev_client import read_dotenv  # noqa: E402
+
+
+def read_dotenv(path):
+    """KEY=VALUE 줄 읽기 (../../common/jev_client.py 와 같은 규칙, 파이썬 3.8 에서도 돌게 따로 둔다)"""
+    env = {}
+    if os.path.exists(path):
+        for line in open(path):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                k = k.strip()
+                if k.startswith("export "):
+                    k = k[len("export "):].strip()
+                env[k] = v.strip().strip("'\"")
+    return env
 
 
 def api_key(name):
