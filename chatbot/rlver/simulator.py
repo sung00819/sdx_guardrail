@@ -2,12 +2,14 @@
 
 감정은 30 에서 시작 (공식 코드 emo_point), 턴마다 LLM 이 낸 변화(−10~+10, 벗어나면 자른다)를 더하고 0~100 으로 자른다.
 상태: S ≥ 100 (고맙다고 하고 끝) · A ≥ 70 · B ≥ 40 · C ≥ 10 · F < 10 (떠난다).
+프로필에 reveal_level(D 털어놓는 정도, convert_scenes.py)이 있으면 숨긴 걱정을 말해도 되는지를 감정 점수로 코드가 정해
+응답 프롬프트에 넣는다 (config disclosure.reveal_emotion).
 """
 
 import json
 import re
 
-from prompts import EMOTION_STATES, ESTIMATE, OPEN_HISTORY, OPEN_PLANNING, PURPOSE, REPLY
+from prompts import DISCLOSURE_NOW, EMOTION_STATES, ESTIMATE, OPEN_HISTORY, OPEN_PLANNING, PURPOSE, REPLY
 
 SECTIONS = ("Content", "Reason", "Activity", "Analyze", "Change")
 
@@ -76,16 +78,24 @@ class SageUser:
         self.emotion = max(0, min(100, self.emotion + change))
         return {"change": change, "emotion": self.emotion, "planning": sec}
 
+    def may_reveal(self):
+        level = self.p.get("reveal_level")
+        return level is None or self.emotion >= self.cfg["reveal_emotion"][str(level)]
+
+    def state_text(self):
+        s = emotion_state(self.emotion)
+        return s if self.p.get("reveal_level") is None else s + "\n" + DISCLOSURE_NOW[self.may_reveal()]
+
     def reply(self, planning=None):
         """f_reply: 현재 감정 상태로 다음 발화"""
         if planning is None:
             prompt = REPLY.format(purpose=PURPOSE, states=EMOTION_STATES, persona=self.p["persona"],
                                   background=self.p["background"], history=OPEN_HISTORY, latest="",
-                                  planning=OPEN_PLANNING, state=emotion_state(self.emotion))
+                                  planning=OPEN_PLANNING, state=self.state_text())
         else:
             feel = ("Objective analysis of the NPC's reply:\n" + planning.get("Reason", "")
                     + "\nSubjective analysis of the NPC's reply:\n" + planning.get("Analyze", ""))
-            prompt = self._format(REPLY, states=EMOTION_STATES, planning=feel, state=emotion_state(self.emotion))
+            prompt = self._format(REPLY, states=EMOTION_STATES, planning=feel, state=self.state_text())
 
         def check(text):
             sec = parse_sections(text, ("Thinking", "Origin", "Change", "Response"))
@@ -110,4 +120,5 @@ class SageUser:
         self.history.append({"role": "assistant", "content": bot_reply})
         est = self.estimate()
         text, thinking = self.reply(est["planning"])
-        return {**est, "user": text, "user_thinking": thinking, "state": emotion_state(self.emotion)}
+        return {**est, "user": text, "user_thinking": thinking, "state": emotion_state(self.emotion),
+                "may_reveal": self.may_reveal()}

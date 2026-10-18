@@ -16,7 +16,22 @@
       "api_key_env": "OPENROUTER_API_KEY"
     }
   },
-  "emotion": {"start": 30, "change_min": -10, "change_max": 10, "end_high": 100, "end_low": 10},
-  "episode": {"max_turns": 8},
-  "reward": {"format_zero": true}
+  "emotion": {
+    "start": 30,
+    "change_min": -10,
+    "change_max": 10,
+    "end_high": 100,
+    "end_low": 10,
+    "reveal_emotion": {
+      "1": 0,
+      "2": 50,
+      "3": 65
+    }
+  },
+  "episode": {
+    "max_turns": 8
+  },
+  "reward": {
+    "format_zero": true
+  }
 }
