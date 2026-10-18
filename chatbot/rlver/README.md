@@ -38,8 +38,10 @@
 ## 대화 · 평가 ([run.py](run.py))
 
 ```bash
-python chatbot/rlver/run.py --split test --chatbot qwen2.5-7b --template guide --out out/rlver/eval_base_guide
-python chatbot/rlver/run.py --summary out/rlver/eval_base_guide   # Score · Success · Failure · event×disclosure·욕구·태도별 Score
+python chatbot/rlver/run.py --split test --combo 0 --per_cell 1 --out out/rlver/peek   # 맛보기: 12칸 × 1명
+python chatbot/rlver/peek.py out/rlver/peek                                       # → out/rlver/peek/dialogues.md
+python chatbot/rlver/run.py --split test --chatbot qwen2.5-7b --template bank --out out/rlver/eval_bank
+python chatbot/rlver/run.py --summary out/rlver/eval_bank   # Score · Success · Failure · event×disclosure·욕구·태도별 Score
 ```
 서버 없이: `--config chatbot/rlver/config_openrouter.json` (시뮬레이터 DeepSeek-V3, 논문과 같음; `.env` 에 `OPENROUTER_API_KEY`).
 
