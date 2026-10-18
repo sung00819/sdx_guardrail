@@ -88,7 +88,7 @@ class SageUser:
             prompt = self._format(REPLY, states=EMOTION_STATES, planning=feel, state=emotion_state(self.emotion))
 
         def check(text):
-            sec = parse_sections(text, ("Thinking", "Origin", "Change", "Response"))
+            sec = parse_sections(text, ("Thinking", "Response"))
             resp = sec.get("Response", "").strip().strip('"“”').strip()
             if not resp:
                 raise ValueError("Response 없음")

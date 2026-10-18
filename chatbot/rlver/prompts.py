@@ -1,7 +1,8 @@
 """RLVER 프롬프트 (arXiv 2507.03112 부록 E.1 + 공식 코드 Tencent/DigitalHuman RLVER).
 
 공식 코드는 중국어다. 논문 부록의 영어 판을 기본으로 하고, 논문에 없고 공식 코드에만 있는 것
-(최신 대화를 따로 보여 주기, Change 는 값만, 자연어가 아니면 감정 급락, 답을 고쳐 쓰는 단계)은 영어로 옮겨 넣었다.
+(최신 대화를 따로 보여 주기, Change 는 값만, 자연어가 아니면 감정 급락)은 영어로 옮겨 넣었다.
+응답 생성은 논문처럼 Thinking → Response 두 단계 (공식 코드의 초안·고쳐 쓰기 단계는 뺐다, 사용자 결정).
 """
 
 # 시뮬레이터의 대화 목적 (공식 target_prompt["eq"], 논문 E.1 heart-to-heart talk)
@@ -87,8 +88,8 @@ Emotion-F: your emotion has reached the most negative level and you don't want t
 REPLY = """You are an actor. You will play the role defined by the character persona and background in the script and have a conversation with an NPC.
 
 # Your task
-* Your goal is to play the role formed by the character persona and background in the dialogue.
-* Choose dialogue strategies according to your real-time changing emotion, combined with the definitions in the persona and background, and give a reply that fits the character.
+* Play the role formed by the character persona and background.
+* Choose how to reply according to your real-time changing emotion and the definitions in the persona and background.
 
 # Your dialogue purpose
 {purpose}
@@ -96,43 +97,23 @@ REPLY = """You are an actor. You will play the role defined by the character per
 # Emotion
 {states}
 
-# Distinguish between your Emotion and your feelings about the NPC's latest reply. Emotion is your current dialogue emotion; the feelings are your immediate reaction to the NPC's reply. Combine both when replying.
+# Distinguish between your Emotion (your current dialogue emotion) and your feelings about the NPC's latest reply (your immediate reaction). Combine both when replying.
 
 # Reply ideas
-* You will receive your detailed feelings about the NPC's latest reply, including an objective and a subjective analysis. Decide the content of your reply from the persona, background, hidden intention and these feelings.
-* Analyze 4 dimensions:
-1. Based on your feelings and current Emotion and the hidden intention, should your attitude now be positive, neutral or negative?
-2. Based on your feelings and current Emotion and the hidden intention, what is the goal of this reply? (You do not need to respond to every word of the NPC. You can hint at your needs, but you must not reveal the hidden intention.)
-3. Based on the speaking style in the persona, the reactions under different emotions in the background, and your attitude and goal, what should your tone and style be?
-4. Based on the persona, background and hidden intention, your feelings and the analysis above, what should your way of speaking and content be? (If the persona is passive, speak passively and do not actively ask questions.)
-* Write an initial reply from the analysis. Its length and form must follow "Message length and form" in the persona (from a few words to several sentences); do not reveal everything at once.
-* Then revise the initial reply to make it more realistic:
-1. Keep the length and form given by "Message length and form" in the persona; a short-message character stays short, a character who pours things out may write several sentences.
-2. Real replies do not state emotions directly; emotions are carried by tone.
-3. Never use phrases like "I really feel...", "I really don't know...", "I really can't take it anymore"; do not use "really" or "at all" to describe feelings.
-4. Do not repeat information you already said in the conversation.
-5. Do not produce a reply similar to earlier ones.
+Using your feelings about the NPC's latest reply, the persona, the background and the hidden intention, think about:
+1. Should your attitude now be positive, neutral or negative?
+2. What is the goal of this reply? (You do not need to respond to every word. You can hint at your needs, but do not reveal the hidden intention.)
+3. What tone, style and content fit the persona and your current emotion?
+
+# Speaking style
+* Follow the persona exactly, including "Message length and form" and "Toward someone trying to help".
+* Talk like a real person in a chat: do not state emotions outright, do not repeat what you already said, at most two questions at a time.
 
 # Output format
 Thinking:
 [Analysis]
-Origin:
-[Initial reply]
-Change:
-[How to revise it]
 Response:
-[Final reply]
-
-# Speaking style
-Your speech must strictly follow the persona and background.
-Your personality and speaking style follow "Habits and behavioral characteristics".
-A negative persona requires negative speech. Your tone fits your age.
-Rules:
-1. Be casual and natural, like a real conversation, at the length given by "Message length and form" in the persona.
-2. Never ask more than two questions at once.
-3. Do not repeat or paraphrase earlier replies.
-4. You may naturally use colloquial words.
-5. Do not pad the reply beyond what the character would really write.
+[Your reply]
 
 # Character persona
 {persona}
@@ -151,8 +132,6 @@ Rules:
 
 ** Your current Emotion
 {state}
-
-The [Response] must not be too similar to the history, must match "Message length and form" in the persona, and must not change the topic on your own.
 """
 
 # 첫 발화: 페르소나+배경으로 짧게 ("나 기분이 안 좋아", "어제 엄마랑 싸웠어"). 원하는 대응 방식은 아직 말하지 않는다
