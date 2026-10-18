@@ -123,7 +123,7 @@ def main():
     def one(job):
         p, s = job
         ep = run_episode(p, bot, sim, cfg, args.template, use_first_talk=not args.no_first_talk)
-        extra = {k: p.get(k) for k in ("combo", "need", "stance", "effort", "n_facet")}  # event·disclosure 는 episode 가 넣는다
+        extra = {k: p.get(k) for k in ("combo", "need", "stance", "effort")}  # event·disclosure 는 episode 가 넣는다
         return {**ep, **extra, "sample": s, "chatbot": bot_cfg["model"]}
 
     fails = 0

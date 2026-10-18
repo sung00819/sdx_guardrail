@@ -206,7 +206,7 @@ TRANSLATE = """Translate the following Chinese text into natural English. Keep e
 {text}"""
 
 
-# ---- 우울한 사용자 확장 (backgrounds.py · compose.py): RLVER 에 Big Five · 대화 노력 · C 태도 · D 털어놓는 정도 · 원하는 대응 방식 3개를 더한다 ----
+# ---- 우울한 사용자 확장 (backgrounds.py · compose.py): RLVER 에 대화 노력 · C 태도 · D 털어놓는 정도 · 원하는 대응 방식 3개를 더한다 ----
 
 # 원하는 대응 방식 3개 (RLVER 숨겨진 의도 8개 대신). 조합에서 고른다 (compose.py)
 NEEDS = {

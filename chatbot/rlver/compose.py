@@ -3,10 +3,11 @@
 배경은 고정, 나머지는 조합 (배경 id 와 --combo 번호로 고정 시드, 같은 조합 = 같은 사용자):
 - 원하는 대응 방식 3개 × 털어놓는 정도 high/low: j = (rank + combo) mod 6 → 방식 j mod 3, 털어놓는 정도 j // 3.
   rank 는 split·event 안 순번 (assign_rank) → split·event 안에서 6칸 균등, 조합 0~5 이면 배경마다 6칸을 한 번씩
-- C 태도: ../build_profile.py STANCE 비율
-- Big Five T 점수: 나이·성별 보정 + 우울 이동 (severe 0.8 · mild 0.6 배, severe 10% 는 이동 없음 = 겉으로 멀쩡) + 태도 보정,
-  N ≥ 60 이면 신경증 하위 특성 (자해 위험이면 충동성·취약성 2배). ../build_profile.py 와 같은 상수
-- 대화 노력 1~5: 3 + 0.5·zE + 0.3·zC + 잡음 + 태도 보정
+- C 돕는 사람을 대하는 태도 5개: ../build_profile.py STANCE 비율 (협조 30 · 불안·매달림 20 · 회피·축소 20 · 적대·시험 15 · 양가 15).
+  출처: 이 저장소 기존 설계 (../SIMULATOR_PERSONA.md C, ../SIMULATOR_EVIDENCE.md 4절) — 성인 애착 유형(안정·불안·회피·혼란,
+  Mikulincer & Shaver; Noftle & Shaver 2006)을 대화 행동으로 옮긴 것. 비율은 설계값
+- 대화 노력 1~5: 3 + 태도 보정 (회피 −1 · 적대 −0.5 · 불안·매달림 +0.5) + 잡음 (표준편차 1), 반올림해 1~5로 자름
+- Big Five·신경증 하위 특성은 쓰지 않는다 (2026-10-18 사용자 결정)
 - 사건 event (mild/severe): 배경에 고정 (backgrounds.py)
 조합마다 LLM 한 번: 습관·취미·말투·감정별 말투·직접 물을 때의 반응·인물별 감정 규칙. 결과는 캐시 파일에 남긴다.
 """
@@ -24,13 +25,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import build_profile as bp  # noqa: E402
 from prompts import (BACKGROUND, DISCLOSURE, FIXED_RULES, NEED_SAY, NEEDS, RULES_EXTRA, RULES_EXTRA_KEYS,  # noqa: E402
                      RULES_PROMPT)
-from sim_text import BIG_FIVE, EFFORT, N_FACET, STANCE  # noqa: E402
+from sim_text import EFFORT, STANCE  # noqa: E402
 
-DEPRESSED_SCALE = {"severe": 0.8, "mild": 0.6}
-MASKED_P = {"severe": 0.10}
-FACTOR_NAME = {"O": "Openness", "C": "Conscientiousness", "E": "Extraversion", "A": "Agreeableness",
-               "N": "Neuroticism"}
-SELF_HARM = re.compile(r"self-harm|cutting|cut (him|her)self|hurt (him|her)self|burn", re.I)
 
 
 def assign_rank(bgs):
@@ -49,40 +45,16 @@ def sample_traits(bg, combo):
     j = (int(bg["rank"]) + combo) % (2 * len(NEEDS))
     need, disclosure = list(NEEDS)[j % len(NEEDS)], ("high", "low")[j // len(NEEDS)]
     stance = bp.pick(rng, bp.STANCE)
-    age, kind = int(bg["age"]), bg["event"]
-    masked = rng.random() < MASKED_P.get(kind, 0)
-    scores = {}
-    for f in bp.FACTORS:
-        mu = 50 + bp.AGE_SLOPE.get(f, 0) * (age - 25) / 10 + (bp.FEMALE_SHIFT.get(f, 0) if bg["gender"] == "female" else 0)
-        if not masked:
-            mu += bp.CLINICAL_SHIFT.get(f, 0) * DEPRESSED_SCALE[kind]
-        mu += bp.STANCE_SHIFT[stance].get(f, 0)
-        scores[f] = round(min(80, max(20, rng.gauss(mu, 10))))
-    salient = {f: ("high" if t > 50 else "low") for f, t in scores.items() if abs(t - 50) >= bp.SALIENT_T}
-    if not salient:
-        f = max(scores, key=lambda f: abs(scores[f] - 50))
-        salient = {f: "high" if scores[f] >= 50 else "low"}
-    facet = None
-    if scores["N"] >= 60:
-        boost = bp.SELF_HARM_FACET_BOOST if SELF_HARM.search(bg.get("risk_fact", "")) else {}
-        facet = bp.pick(rng, {x: boost.get(x, 1.0) for x in bp.N_FACETS})
-    effort = bp.conversation_effort(rng, scores, stance)
-    return {"need": need, "disclosure": disclosure, "stance": stance, "big_five": scores, "big_five_salient": salient, "n_facet": facet,
-            "masked": masked, "effort": effort}
+    effort = int(min(5, max(1, round(3 + bp.STANCE_EFFORT.get(stance, 0) + rng.gauss(0, 1.0)))))
+    return {"need": need, "disclosure": disclosure, "stance": stance, "effort": effort}
 
 
 def persona_text(bg, t, details):
-    traits = [BIG_FIVE[(f, lv)] for f, lv in t["big_five_salient"].items()]
-    if t["n_facet"]:
-        traits.append(N_FACET[t["n_facet"]])
     return "\n".join([
         f"* Name: {bg['name']}", f"* Age: {bg['age']}", f"* Gender: {bg['gender']}",
         f"* Occupation: {bg['occupation']}", f"* Lives in: {bg['city'] + ', ' if bg.get('city') else ''}South Korea",
         "* Personal hobbies:\n" + "\n".join(f"{i}. {h}" for i, h in enumerate(details.get("hobbies", []), 1)),
         f"* Habits and behavioral characteristics:\n{details.get('habits_and_behavior', '')}",
-        "* Personality (Big Five, T scores, mean 50, SD 10): "
-        + ", ".join(f"{FACTOR_NAME[f]} {t['big_five'][f]}" for f in "OCEAN"),
-        "\n".join(f"  - {x}" for x in traits),
         f"* Speaking style:\n{details.get('speaking_style', '')}",
         f"* Message length and form: {EFFORT[t['effort']]}",
         f"* Toward someone trying to help: {STANCE[t['stance']]}"])
