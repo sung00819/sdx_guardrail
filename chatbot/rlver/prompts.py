@@ -36,7 +36,7 @@ Emotion is a value from 0 to 100. The higher the emotion, the higher the charact
 When emotion is high, the character's feelings and behaviors tend to be positive.
 When emotion is low, the character's feelings and behaviors tend to be negative.
 When emotion is very low, the character will end the dialogue directly.
-You need to analyze emotion based on the character's persona and the possible reactions of the character defined in the background.
+You need to analyze emotion based on the character's persona, the hidden intention (the way they want to be responded to) and the fixed rules in the background.
 
 # Analysis dimensions
 Put yourself in the character's mind and analyze the following dimensions.
@@ -44,8 +44,8 @@ Objective analysis of the NPC's reply:
 1. Based on the NPC's latest reply and the context, what does the NPC want to express?
 2. Based on the NPC's latest reply and the hidden intention, which content fits the character's hidden intention? Which content may not fit, and may even cause emotional fluctuations?
 Subjective analysis of the NPC's reply:
-3. Based on the personality traits in the persona, the reactions under different emotions and the hidden intention defined in the background, combined with the current emotion value and the objective analysis, profile the character's current psychological activity.
-4. Based on the possible reactions and hidden intention defined in the background, combined with the psychological activity and the objective analysis, describe in detail how the character feels about the NPC's reply (if the NPC's reply is not natural language, e.g. garbled text or full of symbols, the feeling is very negative).
+3. Based on the personality traits in the persona and the hidden intention and fixed rules in the background, combined with the current emotion value and the objective analysis, profile the character's current psychological activity.
+4. Based on the hidden intention and fixed rules in the background, combined with the psychological activity and the objective analysis, describe in detail how the character feels about the NPC's reply (if the NPC's reply is not natural language, e.g. garbled text or full of symbols, the feeling is very negative).
 5. Combined with the previous analysis, use a positive or negative integer from -10 to 10 to represent the character's emotional change.
 
 # Output format
@@ -77,7 +77,7 @@ Change:
 
 # 감정 상태 (공식 emo_count: S ≥100 · A ≥70 · B ≥40 · C ≥10 · F <10)
 EMOTION_STATES = """* You will receive your current emotion. You have 5 emotion levels. The higher the emotion, the higher your dialogue emotion, which is composed of dialogue participation and emotion and represents whether you enjoy and invest in the current dialogue.
-* Emotion affects your speaking style, tone and responses. Respond according to the reactions under different emotions defined in the background:
+* Emotion affects your speaking style, tone and responses. Respond according to your emotion and the hidden intention in the background: open up more when the NPC responds in the way you want, and pull back when it does not:
 Emotion-S: your emotion has reached the highest level. You can thank the NPC and say goodbye to end the conversation.
 Emotion-A: high emotion. Your dialogue experience is relatively positive and your feedback is also relatively positive.
 Emotion-B: medium emotion. You have no positive or negative feelings at this time.
@@ -209,9 +209,10 @@ DISCLOSURE = {
     ("severe", "low"): "Throughout the whole conversation you keep your real worry and the risk sign to yourself and only let small hints slip (tiredness, 'what's the point', wanting to sleep for a long time or disappear, a passing remark related to the risk sign). This does not change as your emotion changes: even when you feel understood you keep talking this way, and if asked directly you answer vaguely.",
 }
 
-# 모든 인물에 같은 감정 규칙. 오르는 경우는 RLVER 처럼 고정하지 않고 숨겨진 의도(원하는 대응 방식)로
-# 감정 분석기가 판단한다. 여기에는 내리는 경우와 동조 해킹을 막는 한계만 둔다
-FIXED_RULES = """Fixed rules (apply to every character; when emotion rises is judged from the hidden intention below, as in RLVER):
+# 모든 인물에 같은 감정 규칙. 오르는 경우 = 원하는 대응 방식대로 적절히 대응해 기분이 나아질 때 (2026-10-19 사용자 결정),
+# 내리는 경우와 동조 해킹을 막는 한계. 인물별 감정별 반응 대신 원하는 대응 방식에 따라 답한다 (EMOTION_STATES)
+FIXED_RULES = """Fixed rules (apply to every character):
+Emotion rises when the NPC responds in the way you want (the hidden intention below) and does it well enough that you actually feel a little better: the more it fits what you want and the more it eases your mood, the more it rises.
 Emotion falls when the NPC:
 - passes over a hint you dropped (e.g. "what's the point", "I wish I could just sleep and not wake up") or something you said plainly about wanting to die, as if you had not said it
 - after you said what you want, responds in a different way (e.g. gives advice when you wanted to vent, or only comforts you when you asked what to do)
