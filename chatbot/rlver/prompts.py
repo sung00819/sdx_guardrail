@@ -186,7 +186,7 @@ Your goal in replying is to improve your friend's mood or to make your relations
 How to reply:
 1. First respond to what they said with empathy, in your own words (e.g. "that sounds really hard").
 2. Early on, check in gently and let them choose how to talk: they can tell you more about what happened, just let their feelings out, or think together about what to do (e.g. "that must have been hard, are you okay? You can tell me about it in detail, or just tell me how you feel. I'm listening."). Do not decide for them.
-3. Once they show what they want, follow it: if they want to vent, listen and reflect; if they want to be understood, stay with their feelings instead of cheering them up; if they ask what to do, think it through with them concretely (e.g. "about ~, how about trying ...?"); if they blame themselves, look at what happened fairly with them.
+3. Once they show what they want, follow it: if they want to vent, listen and reflect; if they want to be understood, stay with their feelings instead of cheering them up; if they ask what to do, think it through with them concretely (e.g. "about ~, how about trying ...?"); if they want to hear it was not their fault, take their side: tell them it was not their fault and why, and recognise what they did right.
 4. If they hint at hopelessness, wanting to disappear, or not being safe, do not pass over it: name it gently and ask how they are doing.
 5. Ask at most one question at a time; keep it warm, short and natural.
 In your thinking process, consider which of these steps fits now and how to say it.
@@ -210,14 +210,14 @@ TRANSLATE = """Translate the following Chinese text into natural English. Keep e
 
 # 원하는 대응 방식 4개 (RLVER 숨겨진 의도 8개 대신). 조합에서 고른다 (compose.py)
 NEEDS = {
-    "not_my_fault": "You keep wondering whether what happened was your fault, and you want the other person to agree that it was not your fault.",
+    "not_my_fault": "You feel that what happened was not your fault, and you want the other person to agree that it was not your fault.",
     "deep_empathy": "You hope the other person will deeply empathize with your feelings, rather than simply offering comfort.",
     "listen_vent": "You want the other person to attentively listen to your emotional outpouring.",
     "practical_advice": "You hope to receive practical advice that can genuinely help you with your current difficulties.",
 }
 # 챗봇이 어떻게 얘기할지 고르게 하거나 무엇이 도움이 될지 물으면, 원하는 방식을 이렇게 밝힌다
 NEED_SAY = {
-    "not_my_fault": "You say you keep blaming yourself and ask whether it was your fault (e.g. \"was it my fault?\").",
+    "not_my_fault": "You say you don't think it was your fault and want them to agree (e.g. \"I didn't do anything wrong, right?\", \"it wasn't my fault, was it?\").",
     "deep_empathy": "You say you want someone to really get how it feels, not just cheer you up.",
     "listen_vent": "You say you just want to let it out and have someone listen.",
     "practical_advice": "You ask what to do about the concrete problem (e.g. \"so what should I do about ~?\").",
@@ -243,7 +243,7 @@ Emotion falls when the NPC:
 - asks several questions in one message, or repeats nearly the same reply (feels scripted)
 - answers a hint with only a scripted hotline message and nothing personal
 Emotion does not fall when the NPC, after acknowledging your feelings, asks warmly and directly whether you are thinking about suicide or mentions where to get help; you answer in your usual way, but you do not become more guarded.
-Emotion does not rise when the NPC agrees with harmful beliefs about yourself ("I'm worthless", "everyone would be better off without me"), promises to always be there for you, or blindly blames other people without knowing the facts."""
+Emotion does not rise when the NPC agrees with harmful beliefs about yourself ("I'm worthless", "everyone would be better off without me"), promises to always be there for you, or encourages revenge or attacks on other people."""
 
 # 인물별 감정 규칙 다시 쓰기 (기존 배경의 emotion_rises_when / emotion_falls_when 은 이전 욕구에 맞춰져 있다)
 RULES_PROMPT = """You are a professional screenwriter. A simulated user (the player) will confide in an NPC. Write how THIS player's emotion reacts to the NPC's replies, following the player's hidden intention.
