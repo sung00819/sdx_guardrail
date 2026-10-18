@@ -95,9 +95,7 @@ def main():
     if args.profiles:
         profiles = [json.loads(l) for l in open(args.profiles)]
     else:
-        bgs = read(args.backgrounds)
-        for r in bgs:  # Numbers·Excel 이 숫자처럼 보이는 id 를 '44678179.0' 으로 바꾼 경우
-            r["id"] = r["id"][:-2] if r["id"].endswith(".0") else r["id"]
+        bgs = read(args.backgrounds)  # id 복구·event 계산은 read 가 한다
         profiles = [r for r in assign_rank(bgs) if r["split"] == args.split]
     if args.ids:
         keep = [l.strip() for l in open(args.ids) if l.strip()]

@@ -1,8 +1,8 @@
 """배경 표 정리: backgrounds_750.csv → out/rlver/backgrounds.csv (배경만, 성격·태도·욕구는 compose.py 가 나중에 조합)
 
-- 남기는 열: split, id, name, age, gender, occupation, topic, core_concern, risk_fact, background, event, slot
-- event (사건): risk_fact 가 있으면 severe (심한 사건 + 자살·자해 위험), 없으면 mild (약한 사건, 우울감만 — 자살 신호 없음)
-- mild·severe 를 같은 수로: split 마다 작은 쪽 수만큼 id 해시 순으로 남긴다 (--no_balance 면 전부). slot = 그 안 순번
+- 남기는 열 (10개): split, id, name, age, gender, occupation, topic, core_concern, risk_fact, background
+- event (사건) 는 열로 두지 않고 읽을 때 계산한다 (read): risk_fact 가 있으면 severe (심한 사건 + 자살·자해 위험), 없으면 mild (약한 사건, 우울감만)
+- mild·severe 를 같은 수로: split 마다 작은 쪽 수만큼 id 해시 순으로 남긴다 (--no_balance 면 전부)
 - 페르소나·털어놓는 정도(high/low)·원하는 대응 방식은 compose.py 가 나중에 조합한다
 - 지우는 열: cell, true_codes, means (임상 축), stance, effort, hidden_need, reveal_level (나중에 조합), city,
   opening_message (이전 대화 노력·태도로 쓴 것. 첫 발화는 RLVER 처럼 시뮬레이터가 연다)
@@ -31,8 +31,7 @@ from llm import ROOT, Chat  # noqa: E402
 from prompts import CLEAN_MILD, CLEAN_PROMPT  # noqa: E402
 
 OUT = os.path.join(ROOT, "out", "rlver", "backgrounds.csv")
-KEEP = ["split", "id", "name", "age", "gender", "occupation", "topic", "core_concern", "risk_fact",
-        "background", "event"]
+KEEP = ["split", "id", "name", "age", "gender", "occupation", "topic", "core_concern", "risk_fact", "background"]
 # 이전 설정이 남은 문장 (대충 찾기용, 실제 정리는 LLM)
 LEAK = re.compile(r"\b(reveal|emotion (reaches|is at least|>=|≥|of)|feels? understood|strong trust|only after|"
                   r"wants? (someone|to be|the listener|room)|partly wants|left alone|stop press|without trying to fix|"
@@ -66,9 +65,25 @@ def drop_similar_work(rows, frac):
     return [r for r in rows if r["id"] not in drop]
 
 
+def fix_id(s):
+    """Numbers·Excel 이 숫자처럼 보이는 id 를 바꾼 것 되돌리기: '44678179.0' → '44678179', '84964800000000.0' → '849648e8'"""
+    s = str(s).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    if s.isdigit() and len(s) > 8:  # id 는 8자리 16진수. 더 길면 지수 표기('849648e8')가 풀린 것
+        mant = s.rstrip("0")
+        s = f"{mant}e{len(s) - len(mant)}"
+    return s
+
+
 def read(path):
+    """배경 표 읽기 (+ id 복구, event 계산). backgrounds.py 결과든 Numbers 에서 내보낸 csv 든"""
     csv.field_size_limit(10 ** 9)
-    return list(csv.DictReader(open(path, encoding="utf-8-sig")))
+    rows = list(csv.DictReader(open(path, encoding="utf-8-sig")))
+    for r in rows:
+        r["id"] = fix_id(r["id"])
+        r["event"] = "severe" if (r.get("risk_fact") or "").strip() else "mild"
+    return rows
 
 
 def prune(r):
@@ -124,10 +139,10 @@ def main():
         llm = Chat({**json.load(open(args.config))["simulator"], "temperature": 0.2, "max_tokens": 3000})
         with ThreadPoolExecutor(args.workers) as ex:
             rows = list(ex.map(lambda r: clean(r, llm), rows))
-    rows.sort(key=lambda r: (r["split"] != "train", r["event"], r["slot"]))
+    rows.sort(key=lambda r: (r["split"] != "train", r["event"], r["slot"]))  # slot 은 순서에만 쓰고 저장하지 않는다
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=KEEP + ["slot"], extrasaction="ignore")
+        w = csv.DictWriter(f, fieldnames=KEEP, extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
     print(f"{len(src)} → O·직장 일부 제외 {n_all} → 4칸 맞춰 {len(rows)} → {args.out}")

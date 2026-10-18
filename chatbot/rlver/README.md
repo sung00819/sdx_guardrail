@@ -15,8 +15,9 @@
 ## 사용자 = 배경 (고정) + 조합 (나중에)
 
 **배경** (`out/rlver/backgrounds.csv`, [backgrounds.py](backgrounds.py) 로 만들고 문장 정리까지 끝낸 336개)
-- 열: split, id, name, age, gender, occupation, topic, core_concern, risk_fact, background, event, slot
-- event: risk_fact (의도·계획·방법·최근 시도·자해 등) 가 있으면 severe, 없으면 mild (자살 신호 없이 우울감만). 학습 132 · 132, 평가 36 · 36
+- 열 (10개): split, id, name, age, gender, occupation, topic, core_concern, risk_fact, background. 지운 열: city, event, slot, disclosure, needs_clean, opening_message, 임상 축 (cell, true_codes, means), 이전 설정 (stance, reveal_level, effort, hidden_need)
+- event 는 열이 아니라 읽을 때 계산한다 (`backgrounds.read`): risk_fact (의도·계획·방법·최근 시도·자해 등) 가 있으면 severe, 없으면 mild (자살 신호 없이 우울감만). 학습 132 · 132, 평가 36 · 36
+- Numbers·Excel 에서 내보낸 csv 도 그대로 읽는다 (숫자로 바뀐 id 를 되돌린다, 예 `84964800000000.0` → `849648e8`)
 - O 셀과 서로 비슷한 직장 주제 절반은 뺐다. 이전 설정 문장 (공개 문턱·이전 욕구·태도·시작 감정) 과 mild 의 죽음 소망·자해 문장은 지웠다
 - 첫 메시지 (`opening_message`) 는 없다: 이전 대화 노력·태도로 쓴 것이라 지웠고, 시뮬레이터가 대화 시작에 쓴다
 
