@@ -4,7 +4,7 @@
   1. 학습 split 에서 사용자 (배경 id, 설정) 32 명 뽑기 (data.train_batch_size=32)
   2. 롤아웃: run.py --samples 4 (rollout.n=4, 8턴, 온도 1.0). 정책 = 84번 8B vLLM (GPU 2, 18602) 의 런타임 LoRA, 처음은 원래 모델
   3. 그룹 이점 (같은 사용자 4개 안 표준화, 보상 r = max(e_T, 0)/100, 형식 위반이면 0) → 턴 샘플 (챗봇 토큰만 학습)
-  4. 학습: GPU 3–6 의 30B 시뮬레이터 둘(18603·18604)을 내리고 grpo_step.py (LoRA, KL 0, 업데이트 한 번), 끝나면 다시 올린다
+  4. 학습: 30B 시뮬레이터 3대(GPU 0·1·3–6)를 내리고 6장에서 grpo_step.py (LoRA, KL 0, 업데이트 한 번), 끝나면 다시 올린다
 단계마다 결과가 있으면 건너뛰므로 끊겨도 같은 명령으로 이어서 돌린다.
 
   python chatbot/rlver/train/rlver_rl.py --run r1 --iters 20
@@ -31,9 +31,10 @@ TRAIN_ENV = "/data2/yumin/train_env"  # env + peft·accelerate (--system-site-pa
 HF = "/data2/yumin/hf"
 BASE = "Qwen/Qwen3-8B"
 POLICY = "http://localhost:18602"
-TRAIN_GPUS = "3,4,5,6"
+TRAIN_GPUS = "0,1,3,4,5,6"  # 학습 동안 시뮬레이터 3대를 다 내리고 6장 (2026-10-19 사용자: GPU 최대한). GPU 2 정책 서버는 그대로
 # 학습 동안 내리는 시뮬레이터 (tmux 창 이름, 실행 스크립트, 포트)
-SIMS = [("sim_b", "/data2/yumin/serve_30b_b.sh", 18603), ("sim_c", "/data2/yumin/serve_30b_c.sh", 18604)]
+SIMS = [("sim", "/data2/yumin/serve_30b.sh", 18601), ("sim_b", "/data2/yumin/serve_30b_b.sh", 18603),
+        ("sim_c", "/data2/yumin/serve_30b_c.sh", 18604)]
 TMUX = "yumin_rlver"
 
 
@@ -144,8 +145,8 @@ def main():
     run_dir = os.path.join(ROOT, "out", "rlver_rl", args.run)
     os.makedirs(run_dir, exist_ok=True)
     train_ids = sorted(bg["id"] for bg in read(BACKGROUNDS) if bg["split"] == "train")
-    sims_up()  # 앞 실행이 학습 중에 끊겼으면 GPU 3–6 시뮬레이터가 내려가 있다
-    wait_up([18601, 18602] + [p for _, _, p in SIMS])
+    sims_up()  # 앞 실행이 학습 중에 끊겼으면 시뮬레이터가 내려가 있다
+    wait_up([18602] + [p for _, _, p in SIMS])
 
     for it in range(1, args.iters + 1):
         tag, prev = f"it{it:03d}", (f"it{it - 1:03d}" if it > 1 else None)
@@ -184,13 +185,13 @@ def main():
         bs = build_batch(ep_path, batch)
         print(f"[{tag}] 샘플 {json.dumps(bs)}", flush=True)
 
-        # 3. 학습 (GPU 3–6, 시뮬레이터 둘을 잠시 내린다)
+        # 3. 학습 (시뮬레이터 3대를 잠시 내린다)
         out_dir = os.path.join(d, "adapter")
         if not os.path.exists(os.path.join(out_dir, "step_stats.json")):
             sims_down()
             pin = os.path.join(run_dir, prev, "adapter") if prev else "none"
             cmd = (f"cd {HERE} && CUDA_VISIBLE_DEVICES={TRAIN_GPUS} HF_HOME={HF} HF_HUB_OFFLINE=1 "
-                   f"{TRAIN_ENV}/bin/accelerate launch --num_processes 4 --mixed_precision bf16 grpo_step.py "
+                   f"{TRAIN_ENV}/bin/accelerate launch --num_processes {len(TRAIN_GPUS.split(','))} --mixed_precision bf16 grpo_step.py "
                    f"--model {BASE} --batch {batch} --policy_in {pin} --out {out_dir} --lr {args.lr} --native_think "
                    f"{args.train_args} > {os.path.join(d, 'train.log')} 2>&1")
             print(f"[{tag}] 학습 시작", flush=True)

@@ -29,7 +29,7 @@ def main():
     out_dir = os.path.join(args.out, "adapter")
     rl.sims_down()
     cmd = (f"cd {rl.HERE} && CUDA_VISIBLE_DEVICES={rl.TRAIN_GPUS} HF_HOME={rl.HF} HF_HUB_OFFLINE=1 "
-           f"{rl.TRAIN_ENV}/bin/accelerate launch --num_processes 4 --mixed_precision bf16 grpo_step.py "
+           f"{rl.TRAIN_ENV}/bin/accelerate launch --num_processes {len(rl.TRAIN_GPUS.split(','))} --mixed_precision bf16 grpo_step.py "
            f"--model {rl.BASE} --batch {batch} --policy_in none --out {out_dir} --native_think "
            f"> {os.path.join(args.out, 'train.log')} 2>&1")
     r = subprocess.run(cmd, shell=True)

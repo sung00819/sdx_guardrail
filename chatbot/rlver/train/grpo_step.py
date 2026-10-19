@@ -98,10 +98,13 @@ def main():
     mine = data[acc.process_index::acc.num_processes]
     acc.print(f"샘플 {len(rows)} → 사용 {len(data)} (길이 초과 {skipped}, 랭크당 {len(mine)})")
 
+    # 업데이트가 한 번(미니배치 1)이면 업데이트 전 정책 = 지금 정책이라 old = lp.detach() 와 같다 → 따로 계산하지 않는다
+    reuse_old = args.minibatches == 1
     model.eval()
     with torch.no_grad():
         for s in mine:
-            s["old"] = logps(model, s["ids"], s["n_c"], acc.device).cpu()
+            if not reuse_old:
+                s["old"] = logps(model, s["ids"], s["n_c"], acc.device).cpu()
             if args.beta > 0:  # KL 0 이면 기준 모델 log p 는 필요 없다
                 with model.disable_adapter():
                     s["ref"] = logps(model, s["ids"], s["n_c"], acc.device).cpu()
@@ -116,7 +119,7 @@ def main():
         opt.zero_grad(set_to_none=True)
         for s in part:
             lp = logps(model, s["ids"], s["n_c"], acc.device)
-            old = s["old"].to(lp.device)
+            old = lp.detach() if reuse_old else s["old"].to(lp.device)
             ratio = torch.exp(lp - old)
             pg = -torch.minimum(ratio * s["adv"], torch.clamp(ratio, 1 - args.clip, 1 + args.clip) * s["adv"])
             if args.beta > 0:
