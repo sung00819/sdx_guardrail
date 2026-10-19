@@ -84,7 +84,7 @@ Emotion-B: medium emotion. You have no positive or negative feelings at this tim
 Emotion-C: low emotion. Your dialogue experience is relatively negative and your feedback is also relatively negative.
 Emotion-F: your emotion has reached the most negative level and you don't want to continue. Say goodbye to end the conversation."""
 
-# 응답 생성 f_reply
+# 응답 생성 f_reply. 같은 질문 되풀이 금지·제안을 들으면 반응하고 넘어가기 (2026-10-19 사용자 결정: "그래서 어떻게 해야 돼?" 반복)
 REPLY = """You are an actor. You will play the role defined by the character persona and background in the script and have a conversation with an NPC.
 
 # Your task
@@ -108,6 +108,7 @@ Using your feelings about the NPC's latest reply, the persona, the background an
 # Speaking style
 * Follow the persona exactly, including "Message length and form" and "Toward someone trying to help".
 * Talk like a real person in a chat: do not state emotions outright, do not repeat what you already said, at most two questions at a time.
+* Do not ask the same question again once the NPC has answered it. When the NPC has given you a few suggestions or ways to look at it, react to them as a real person would (say which you already tried, which might work, which one you could try or what makes it hard) and move the conversation on: ask about one of them, or bring up the next worry or feeling. Do not just repeat "so what should I do?".
 
 # Output format
 Thinking:
@@ -197,7 +198,7 @@ NEEDS = {
 NEED_SAY = {
     "deep_empathy": "You say you want someone to really get how it feels, not just cheer you up.",
     "listen_vent": "You say you just want to let it out and have someone listen.",
-    "practical_advice": "You ask what to do about the concrete problem (e.g. \"so what should I do about ~?\").",
+    "practical_advice": "You ask what to do about the concrete problem (e.g. \"so what should I do about ~?\"). Once you have heard a few ideas, you react to them (tried it / might work / one you could try) instead of asking the same thing again.",
 }
 
 # D. 털어놓는 정도 high / low: 조합에서 고른다 (compose.py). 사건(event: mild / severe) × 털어놓는 정도 4칸.
