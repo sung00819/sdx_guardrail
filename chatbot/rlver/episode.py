@@ -9,7 +9,7 @@ import difflib
 import re
 
 import bank as strategy_bank
-from prompts import CHATBOT
+from prompts import CHATBOT, REPLY_FORMAT, TAG_FORMAT, TAG_REPLY
 from simulator import SageUser
 
 THINK_TEMPLATES = ("think", "guide", "bank", "bank_oracle")
@@ -55,7 +55,10 @@ def system_prompt(profile, template, native=False):
         return strategy_bank.assemble(strategy_bank.load(), native=native)
     if template == "bank_oracle":
         return strategy_bank.assemble(strategy_bank.load(), profile.get("need"), profile.get("event"), native)
-    return CHATBOT[template]
+    text = CHATBOT[template]
+    if TAG_REPLY in text:  # think·guide: bank 와 같은 답 형식 (생각 100단어 · 답 40단어, 자체 생각 모델이면 native)
+        text = text.replace(TAG_FORMAT, "").replace(TAG_REPLY, REPLY_FORMAT["native" if native else "tags"])
+    return text
 
 
 def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=True):

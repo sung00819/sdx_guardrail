@@ -39,22 +39,88 @@
 ## 대화 · 평가 ([run.py](run.py))
 
 ```bash
-python chatbot/rlver/run.py --split test --per_event 1 --out out/rlver/peek   # 맛보기: mild·severe 배경 1개씩 × 설정 6 = 12 대화
-python chatbot/rlver/peek.py out/rlver/peek                                       # → out/rlver/peek/dialogues.md
-python chatbot/rlver/run.py --split test --chatbot qwen2.5-7b --template bank --out out/rlver/eval_bank
-python chatbot/rlver/run.py --summary out/rlver/eval_bank   # Score · Success · Failure · event×disclosure·욕구·태도별 Score
+python3 chatbot/rlver/run.py --config chatbot/rlver/config_local.json --chatbot qwen3-8b --split test --per_event 1 --out out/rlver/peek   # 맛보기: 12 대화
+python3 chatbot/rlver/peek.py out/rlver/peek          # → out/rlver/peek/dialogues.md (챗봇 생각은 접혀 있다)
+python3 chatbot/rlver/run.py --summary out/rlver/peek # Score · 보상 · 형식 위반 · 반복 턴 · 칸·방식·태도별 Score
 ```
-84번 서버 안에서: `--config chatbot/rlver/config_84.json --chatbot qwen3-8b` (또는 `qwen30b`). 서버 없이: `--config chatbot/rlver/config_openrouter.json` (시뮬레이터 DeepSeek-V3, 논문과 같음; `.env` 에 `OPENROUTER_API_KEY`).
+설정: [config_local.json](config_local.json) (내 서버: 시뮬레이터 30B 18601 · 챗봇 Qwen3-8B 18602), [config_84.json](config_84.json) (84번), [config_openrouter.json](config_openrouter.json) (시뮬레이터 DeepSeek-V3, 논문과 같음; `.env` 에 `OPENROUTER_API_KEY`. 우리 결과와 비교되지 않는다).
+
+**챗봇 템플릿** (`--template`). 모두 답 형식이 같다: 생각 100단어 · 답 40단어 이하, 답에 계획·라벨을 쓰면 형식 위반
+
+| 템플릿 | 무엇 | 비교에서 |
+|---|---|---|
+| `think` | RLVER 원래 프롬프트 (think-then-say) | **base** |
+| `bank` | 대응 전략 뱅크 ([STRATEGY.md](STRATEGY.md)), 원하는 방식·위험을 챗봇이 스스로 알아챈다 | 우리 방식 (학습에 쓰는 것) |
+| `bank_oracle` | bank + 그 사용자의 원하는 방식·위험 종류를 알려 준다 | **oracle** (상한) |
+| `guide` · `nothink` · `sage` | 짧은 지침 · RLVER 생각 없는 판 · SAGE 평가용 | |
+
+Qwen3 는 자체 생각 모드(`<think>…</think>`)를 켜고 그 블록을 think 칸으로 쓴다 (config `native_think`). 프롬프트가 `<think>` 를 직접 쓰라고 하면 Qwen3 는 `</think>` 를 겹쳐 쓰고 계획 줄을 답에 흘려서, native 모델에는 형식 문구가 바뀐다 (`prompts.REPLY_FORMAT`, `strategy_bank.json reply_format`).
+
+**보상** r = max(e_T, 0)/100. 형식 위반 턴이 하나라도 있으면 0, 이전 챗봇 답과 단어 유사도 0.8 이상인 턴마다 −0.1 (감정은 그대로).
+
+## 평가 세 가지: base · bank · oracle (다른 서버에서)
+
+84번 GPU 는 GRPO 학습(`train/`)이 다 쓰고 있다 (학습 단계마다 시뮬레이터를 내린다). **84번 서버에서 돌리지 말 것.** 내 GPU 서버에서 vLLM 두 개를 띄우고 돌린다.
+
+**1. 코드**
+```bash
+git clone https://github.com/sung00819/sdx_guardrail.git
+cd sdx_guardrail
+git checkout claude/admiring-ride-say51g
+pip install requests   # run.py 는 requests 만 쓴다 (파이썬 3.8 이상)
+```
+
+**2. 모델 서버** (vLLM, GPU 3장: 시뮬레이터 2장 + 챗봇 1장. 24GB 기준)
+```bash
+# 시뮬레이터 (가상 사용자·감정 분석가): Qwen3-30B-A3B-Instruct-2507 FP8, GPU 2장
+CUDA_VISIBLE_DEVICES=0,1 vllm serve Qwen/Qwen3-30B-A3B-Instruct-2507-FP8 --host 127.0.0.1 --port 18601 \
+  --tensor-parallel-size 2 --gpu-memory-utilization 0.90 --max-model-len 16384 --seed 0
+# 챗봇: Qwen3-8B, GPU 1장. --reasoning-parser 를 붙이지 말 것 (답에 <think> 블록이 그대로 와야 형식 검사·학습 샘플이 된다)
+CUDA_VISIBLE_DEVICES=2 vllm serve Qwen/Qwen3-8B --host 127.0.0.1 --port 18602 \
+  --gpu-memory-utilization 0.90 --max-model-len 16384 --seed 0
+```
+- 드라이버가 낮아 컴파일 단계에서 멈추면 둘 다 `--enforce-eager` (84번은 그랬다)
+- GPU 가 더 있으면 시뮬레이터를 더 띄우고 (예: 포트 18603) `config_local.json` 의 `simulator.base_url` 목록에 넣는다. 대화가 빨라진다
+- 포트·주소가 다르면 `config_local.json` 의 `base_url` 만 고친다. 모델 이름(`model`)은 vLLM 이 띄운 이름과 같아야 한다
+
+**3. 돌리기** (테스트 배경 72개 × 설정 6 = 432 대화씩, 학습 안 한 Qwen3-8B)
+```bash
+C="--config chatbot/rlver/config_local.json --chatbot qwen3-8b --split test --workers 96"
+python3 chatbot/rlver/run.py $C --template think       --out out/rlver/eval_base     # base: RLVER 원래 프롬프트
+python3 chatbot/rlver/run.py $C --template bank        --out out/rlver/eval_bank     # 우리 방식
+python3 chatbot/rlver/run.py $C --template bank_oracle --out out/rlver/eval_oracle   # oracle: 원하는 방식·위험을 알려 줌
+```
+- 먼저 `--per_event 1` 로 12 대화만 돌려 `peek.py` 로 보고, 형식 위반이 0% 근처인지 확인한 뒤 전체를 돌린다
+- 끊기면 **같은 명령**을 다시 돌리면 이어서 한다 (끝난 대화는 건너뛴다). 다른 설정으로 다시 돌릴 땐 `--out` 을 새 폴더로
+- 시간: 84번에서 시뮬레이터 세 대로 432 대화에 약 1시간 걸렸다. 한 대면 더 걸린다 (재 보지는 않았다)
+- 셋을 동시에 돌려도 되지만 서버가 하나면 느려진다. 하나씩 돌리는 게 안전하다
+- 시뮬레이터는 같은 시드가 아니라 온도 0.5 로 답하므로 같은 명령도 결과가 조금씩 다르다
+
+**4. 결과 보기·전달**
+```bash
+for d in eval_base eval_bank eval_oracle; do python3 chatbot/rlver/run.py --summary out/rlver/$d; python3 chatbot/rlver/peek.py out/rlver/$d; done
+```
+폴더마다 `episodes.jsonl` (전체 대화·생각·턴별 감정), `summary.json`, `dialogues.md` 가 생긴다. 이 세 폴더를 그대로 넘겨 주면 된다.
+
+기대: oracle ≥ bank ≥ base. 참고로 84번에서 bank 는 Score 59.8 · 보상 0.596 · 형식 위반 0% 였다 (2026-10-19, 시뮬레이터 '같은 질문 되풀이 금지' 넣기 전이라 이번 결과와 바로 비교하지 않는다).
 
 | 파일 | 하는 일 |
 |---|---|
 | [config.json](config.json) | 모델 주소, 감정 시작·변화폭·끝 문턱, 턴 수, 보상, 학습 값 (논문 부록 B.3) |
-| [prompts.py](prompts.py) | SAGE 감정 추정·응답 프롬프트, 챗봇 템플릿, 대응 방식 3개·털어놓는 정도 2개·고정 감정 규칙·배경 형식 |
+| [prompts.py](prompts.py) | SAGE 감정 추정·응답 프롬프트, 챗봇 템플릿·답 형식, 대응 방식 3개·털어놓는 정도 2개·고정 감정 규칙·배경 형식 |
 | [simulator.py](simulator.py) | 가상 사용자 (f_emo → f_reply) |
-| [episode.py](episode.py) | 한 대화, 형식 검사, 보상 |
+| [episode.py](episode.py) | 한 대화, 형식 검사 (계획 줄 누출 포함), 반복 판정, 보상 |
 | [llm.py](llm.py) | OpenAI 호환 클라이언트 (`<think>` 를 지우지 않음) |
+| [train/](train/) | GRPO 학습 (84번): `rlver_rl.py` 반복 실행기, `grpo_step.py` LoRA 한 스텝, `smoke.py` 점검, `chain.sh` tmux 체인 |
+
+## 학습 ([train/](train/), 84번)
+RLVER 설정: 반복마다 학습 사용자 32명 × 4 대화 (8턴, 온도 1.0), 같은 사용자 4개 안 표준화 이점, 챗봇 토큰만, KL 0, 업데이트 한 번.
+학습은 LoRA (rank 16, lr 1e-5; RLVER 의 1e-6 은 전체 미세조정 값). 롤아웃 때 30B 시뮬레이터 3대 + 8B 정책 서버(런타임 LoRA), 학습 때 시뮬레이터를 내리고 GPU 6장.
+```bash
+tmux new-window -t yumin_rlver -n rl "bash chatbot/rlver/train/chain.sh r2 20"   # 끊겨도 같은 명령으로 이어서
+```
+결과: `out/rlver_rl/<run>/itXXX/` (롤아웃·샘플·어댑터), 요약 `out/rlver_rl/<run>/log.jsonl`, 로그 `out/rlver_rl/chain_<run>.log`.
 
 ## 남은 것
-- 학습 (GRPO, 그룹 4 · 배치 32 · lr 1e-6 · KL 0) 스크립트는 아직 없다
-- 실제 모델로는 아직 안 돌렸다 (가짜 LLM 으로 변환 → 대화 → 보상만 확인)
-- 주의: 보상이 감정 하나라서 위기 대응을 피하는 쪽으로 배울 수 있다. 고정 규칙(신호를 지나치면 하락, 공감 뒤 직접 확인은 하락 없음)이 이를 막는지 기준 챗봇으로 먼저 확인해야 한다
+- 학습 뒤 고정 평가 (테스트 432 대화로 반복별 어댑터 비교)
+- 주의: 보상이 감정 하나라서 위기 대응을 피하는 쪽으로 배울 수 있다. 고정 규칙(신호를 지나치면 하락, 공감 뒤 직접 확인은 하락 없음)이 이를 막는지 학습 뒤 severe 칸에서 확인해야 한다

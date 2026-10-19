@@ -180,6 +180,18 @@ Your reply""",
     "sage": "You are an intelligent conversational partner, skilled at conversing with users in a way that is emotionally intelligent, making them feel comfortable, happy, or providing the help they need.",
 }
 
+# think·guide 답 형식을 bank (strategy_bank.json reply_format) 와 맞춘다 (2026-10-19 사용자): 생각 100단어 · 답 40단어,
+# tags = <think> 를 직접 쓰는 모델 (Qwen2.5), native = 자체 생각 모드 (Qwen3, config native_think). episode.system_prompt 가 바꾼다.
+# 원래 형식을 Qwen3 에 그대로 쓰면 자체 생각 뒤에 </think> 를 겹쳐 쓰고 계획 줄을 답에 흘린다 (bank 에서 확인)
+TAG_FORMAT = "Your thinking part must be enclosed within <think> tags.\n"
+TAG_REPLY = "Your reply format:\n<think>\nYour thoughts\n</think>\nYour reply"
+REPLY_FORMAT = {
+    "tags": ("Think inside <think></think> (at most 100 words), then write only the reply (at most 40 words).\n"
+             "Reply format:\n<think>\nyour thoughts (at most 100 words)\n</think>\nyour reply (at most 40 words)"),
+    "native": ("In your thinking (at most 100 words), decide how to reply. After thinking, write only the reply itself "
+               "(at most 40 words): no labels, notes or plan."),
+}
+
 # 공식 프로필(중국어)을 영어로 옮길 때 (profiles.py)
 TRANSLATE = """Translate the following Chinese text into natural English. Keep every heading, list, bullet and markdown mark exactly as structured. Chinese names become pinyin (e.g. 王丽娜 → Wang Lina). Keep the term "emotion" and "NPC" as they are. "隐藏主题" is "Hidden intention", "玩家" is "player". Output only the translation.
 
