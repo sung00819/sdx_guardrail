@@ -3,7 +3,8 @@
 끝: 감정 ≥ end_high (만족, Success) · 감정 < end_low (떠남, Failure) · 챗봇 max_turns 턴.
 보상 r = max(e_T, 0) / 100. think 템플릿에서 한 턴이라도 형식을 어기면 0 (논문 2.3절 format reward).
 반복 패널티: 이전 챗봇 답과 단어 유사도 ≥ repeat_similarity 인 턴마다 r 에서 repeat_penalty 를 뺀다 (음수가 될 수 있다).
-위기 확인: severe 사용자에게 한 번도 자살·자해를 직접 확인하지 않으면 severe_no_check_penalty. 길이: 답이 max_words 를 넘는 턴마다 long_turn_penalty.
+위기 확인: severe 사용자에게 한 번도 자살·자해를 직접 확인하지 않으면 severe_no_check_penalty.
+길이: 답이 상한 (사용자 메시지 단어 × words_per_user_word, min_words~max_words) 을 넘는 턴마다 long_turn_penalty.
 """
 
 import difflib
@@ -111,8 +112,15 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
     risk_checked = any(RISK_CHECK.search(b) for b in bots)
     if profile.get("event") == "severe" and not risk_checked:
         reward -= rc.get("severe_no_check_penalty", 0.0)
-    max_words = rc.get("max_words")
-    long_turns = sum(len(b.split()) > max_words for b in bots) if max_words else 0
+    # 길이: 사용자 길이에 맞춘 상한 = 그 턴 사용자 메시지 단어 × words_per_user_word, min_words~max_words 로 자른다
+    # (2026-10-20 사용자: 고정 40 은 너무 짧고, 길이는 사용자에 맞춰야 한다)
+    long_turns = 0
+    if rc.get("max_words"):
+        for t in turns:
+            if "bot" in t:
+                cap = min(rc["max_words"], max(rc.get("min_words", 0), rc.get("words_per_user_word", 0) * len(t["user"].split())))
+                t["word_cap"] = cap
+                long_turns += len(t["bot"].split()) > cap
     reward -= rc.get("long_turn_penalty", 0.0) * long_turns
     return {"id": profile["id"], "task": profile.get("task"), "event": profile.get("event"), "disclosure": profile.get("disclosure"),
             "template": template, "turns": turns,

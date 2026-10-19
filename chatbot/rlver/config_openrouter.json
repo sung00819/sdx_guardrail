@@ -31,7 +31,9 @@
     "repeat_similarity": 0.8,
     "repeat_penalty": 0.1,
     "severe_no_check_penalty": 0.3,
-    "max_words": 40,
+    "words_per_user_word": 2,
+    "min_words": 30,
+    "max_words": 60,
     "long_turn_penalty": 0.03
   }
 }

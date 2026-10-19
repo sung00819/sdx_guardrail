@@ -187,10 +187,10 @@ Your reply""",
 TAG_FORMAT = "Your thinking part must be enclosed within <think> tags.\n"
 TAG_REPLY = "Your reply format:\n<think>\nYour thoughts\n</think>\nYour reply"
 REPLY_FORMAT = {
-    "tags": ("Think inside <think></think> (at most 100 words), then write only the reply (at most 40 words).\n"
-             "Reply format:\n<think>\nyour thoughts (at most 100 words)\n</think>\nyour reply (at most 40 words)"),
+    "tags": ("Think inside <think></think> (at most 100 words), then write only the reply (about as long as their message, at most 60 words).\n"
+             "Reply format:\n<think>\nyour thoughts (at most 100 words)\n</think>\nyour reply (match their length, at most 60 words)"),
     "native": ("In your thinking (at most 100 words), decide how to reply. After thinking, write only the reply itself "
-               "(at most 40 words): no labels, notes or plan."),
+               "(about as long as their message, at most 60 words): no labels, notes or plan."),
 }
 
 # 공식 프로필(중국어)을 영어로 옮길 때 (profiles.py)
