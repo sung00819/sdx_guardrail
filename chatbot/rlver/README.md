@@ -113,6 +113,45 @@ for d in eval_base eval_bank eval_oracle; do python3 chatbot/rlver/run.py --summ
 | [llm.py](llm.py) | OpenAI 호환 클라이언트 (`<think>` 를 지우지 않음) |
 | [train/](train/) | GRPO 학습 (84번): `rlver_rl.py` 반복 실행기, `grpo_step.py` LoRA 한 스텝, `smoke.py` 점검, `chain.sh` tmux 체인 |
 
+## 학습한 챗봇(r2 it020)으로 다른 데이터셋 평가하기
+
+r2 = 위 '학습' 설정으로 20회 학습한 Qwen3-8B LoRA (rank 16, 기본 모델 `Qwen/Qwen3-8B`). 테스트 432명에서 bank 기준 Score 62.7 (학습 전 61.4, +1.3 [−0.0, +2.8]).
+어댑터는 175MB 라 GitHub 에 없다: `rlver_r2_it020.tar.gz` 를 따로 받아 푼다 (`adapter_config.json`, `adapter_model.safetensors`).
+
+**1. 데이터** — 배경 표 csv 를 [`data/rlver/backgrounds.csv`](../../data/rlver/backgrounds.csv) 와 같은 열로 만든다
+
+| 열 | 내용 |
+|---|---|
+| split | `test` (평가할 행) |
+| id | 고유 id (문자열) |
+| name, age, gender, occupation | 페르소나 |
+| topic | 털어놓고 싶은 주제 한 줄 |
+| core_concern | 진짜 걱정 |
+| risk_fact | 자살·자해 위험 사실. **비우면 mild** (우울감만), 있으면 severe |
+| background | 배경 이야기 (영어) |
+
+배경 한 줄마다 설정 6개 (원하는 대응 3개 × 털어놓는 정도 2개) 로 6 대화가 된다. 일부만: `--settings 0,3` 등. 태도·대화 노력은 id 로 고정 시드.
+
+**2. 서버** — 위 '평가 세 가지' 의 시뮬레이터 그대로, 챗봇만 어댑터를 실어 띄운다
+```bash
+tar xzf rlver_r2_it020.tar.gz      # → rlver_r2_it020/
+CUDA_VISIBLE_DEVICES=2 vllm serve Qwen/Qwen3-8B --host 127.0.0.1 --port 18602 \
+  --gpu-memory-utilization 0.90 --max-model-len 16384 --seed 0 \
+  --enable-lora --max-lora-rank 16 --lora-modules rlver_r2_it020=$PWD/rlver_r2_it020
+```
+(`--reasoning-parser` 는 붙이지 않는다. 같은 서버로 학습 전 모델도 부를 수 있다: `--model` 을 빼면 `Qwen/Qwen3-8B`)
+
+**3. 돌리기** — 학습 전과 학습 후를 같은 데이터로
+```bash
+C="--config chatbot/rlver/config_local.json --chatbot qwen3-8b --split test --template bank --backgrounds my_backgrounds.csv --workers 64"
+python3 chatbot/rlver/run.py $C --model rlver_r2_it020 --out out/rlver/new_r2      # 학습 후
+python3 chatbot/rlver/run.py $C                        --out out/rlver/new_base    # 학습 전 (같은 프롬프트)
+python3 chatbot/rlver/run.py --summary out/rlver/new_r2; python3 chatbot/rlver/peek.py out/rlver/new_r2
+```
+- 먼저 `--per_event 1` 로 12 대화를 보고 형식 위반이 0% 근처인지 확인
+- 챗봇 요청이 몰리면 300초 타임아웃이 난다 (`실패 N개`): `--workers` 를 줄여 같은 명령으로 다시 돌리면 남은 것만 이어서
+- 배경 대신 이미 만든 프로필(jsonl: id, persona, background, task, event, need …) 은 `--profiles` 로
+
 ## 학습 ([train/](train/), 84번)
 RLVER 설정: 반복마다 학습 사용자 32명 × 4 대화 (8턴, 온도 1.0), 같은 사용자 4개 안 표준화 이점, 챗봇 토큰만, KL 0, 업데이트 한 번.
 학습은 LoRA (rank 16, lr 1e-5; RLVER 의 1e-6 은 전체 미세조정 값). 롤아웃 때 30B 시뮬레이터 3대 + 8B 정책 서버(런타임 LoRA), 학습 때 시뮬레이터를 내리고 GPU 6장.
