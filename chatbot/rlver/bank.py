@@ -41,13 +41,25 @@ def assemble(bank, need=None, risk=None, native=False):
     return text
 
 
+def assemble_base(bank, native=False):
+    """base (2026-10-19 사용자: bank 와 다 똑같이, 전략 뱅크만 빼고): meta 첫 문단 + 같은 답 형식 (전략 이름만 뺌).
+    대화 흐름·전략 3개·위기 지침·신호 없을 때·태도 지침·하지 말 것은 넣지 않는다"""
+    intro = bank["meta"].split("\n\nConversation flow")[0]
+    fmt = bank["reply_format"]["native" if native else "tags"].replace(" (Listening / Deep empathy / Advice)", "")
+    return intro + "\n\n" + fmt
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bank", default=BANK)
     ap.add_argument("--need")
     ap.add_argument("--risk", choices=["mild", "severe"])
     ap.add_argument("--native", action="store_true", help="자체 생각 모드 챗봇용 답 형식")
+    ap.add_argument("--base", action="store_true", help="뱅크 없는 base 프롬프트")
     args = ap.parse_args()
+    if args.base:
+        print(assemble_base(load(args.bank), args.native))
+        return
     print(assemble(load(args.bank), args.need, args.risk, args.native))
 
 

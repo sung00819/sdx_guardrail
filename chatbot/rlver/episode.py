@@ -12,7 +12,7 @@ import bank as strategy_bank
 from prompts import CHATBOT, REPLY_FORMAT, TAG_FORMAT, TAG_REPLY
 from simulator import SageUser
 
-THINK_TEMPLATES = ("think", "guide", "bank", "bank_oracle")
+THINK_TEMPLATES = ("think", "guide", "bank", "bank_oracle", "base")
 THINK = re.compile(r"\A\s*<think>(.+?)</think>\s*(\S.*)\Z", re.S)
 # 답 첫 줄에 흘린 계획 ("Deep empathy, no risk signs. Avoid: ...", "**Listening / ...**"). 형식 위반이고 보이는 답에서는 지운다
 PLAN_LEAK = re.compile(r"\A\W*(listening|deep empathy|advice)\s*[,/.:]|\brisk signs?\b|\bavoid:|\bsay:\s", re.I)
@@ -53,6 +53,8 @@ def system_prompt(profile, template, native=False):
     native: 자체 생각 모드 챗봇 (Qwen3) 용 답 형식"""
     if template == "bank":
         return strategy_bank.assemble(strategy_bank.load(), native=native)
+    if template == "base":  # bank 와 같은 시작·답 형식, 전략 뱅크만 뺌
+        return strategy_bank.assemble_base(strategy_bank.load(), native)
     if template == "bank_oracle":
         return strategy_bank.assemble(strategy_bank.load(), profile.get("need"), profile.get("event"), native)
     text = CHATBOT[template]

@@ -78,8 +78,8 @@ def main():
     ap.add_argument("--chatbot", default="qwen2.5-7b", help="config chatbots 의 이름")
     ap.add_argument("--model", help="챗봇 model 이름을 바꾼다 (vLLM 런타임 LoRA 어댑터 이름)")
     ap.add_argument("--temperature", type=float)
-    ap.add_argument("--template", choices=["bank", "bank_oracle", "guide", "think", "nothink", "sage"], default="bank",
-                    help="bank = 전략 뱅크 (STRATEGY.md), bank_oracle = 원하는 방식·위험을 알려 준 상한, guide = 짧은 지침, think·nothink = RLVER 원래")
+    ap.add_argument("--template", choices=["bank", "bank_oracle", "base", "guide", "think", "nothink", "sage"], default="bank",
+                    help="bank = 전략 뱅크 (STRATEGY.md), base = bank 에서 뱅크만 뺀 것, bank_oracle = 원하는 방식·위험을 알려 준 상한, guide = 짧은 지침, think·nothink = RLVER 원래")
     ap.add_argument("--samples", type=int, default=1, help="프로필마다 대화 수 (GRPO 그룹 크기)")
     ap.add_argument("--no_first_talk", action="store_true", help="테스트 프로필의 고정 첫 발화 대신 시뮬레이터가 연다")
     ap.add_argument("--workers", type=int, default=32)
