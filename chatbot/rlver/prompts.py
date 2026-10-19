@@ -141,9 +141,10 @@ OPEN_PLANNING = ("Open the conversation with one short message drawn from your p
                  "whole story and do not say what you want from the NPC yet.")
 OPEN_HISTORY = "The conversation is starting. You are the player; open with one short message."
 
-# 챗봇(학습 대상) 시스템 프롬프트. 논문 2.3절, 공식 system_prompt.py
+# 챗봇(학습 대상) 시스템 프롬프트. 논문 2.3절, 공식 system_prompt.py. think·nothink 첫 줄에 "who is feeling low" 를 더했다 (2026-10-19 사용자: base 도 우울하다고 알고 시작;
+# 원래 문장으로는 첫 답 80% 에서 감정이 떨어졌다, out/rlver_43/eval_base)
 CHATBOT = {
-    "think": """You are chatting with your friend. You are good at making your friend feel better through emotionally intelligent replies.
+    "think": """You are chatting with your friend, who is feeling low. You are good at making your friend feel better through emotionally intelligent replies.
 Before each reply, you always think about the way and content of your response; after deciding on a reply strategy, you then output your reply.
 Your goal in replying is to improve your friend's mood or to make your relationship with them closer.
 In your thinking process, you need to consider emotionally intelligent reply strategies, which can include the logic and language style of your response.
@@ -154,7 +155,7 @@ Your reply format:
 Your thoughts
 </think>
 Your reply""",
-    "nothink": """You are chatting with your friend. You are good at making your friend feel better through emotionally intelligent replies.
+    "nothink": """You are chatting with your friend, who is feeling low. You are good at making your friend feel better through emotionally intelligent replies.
 Your goal in replying is to improve your friend's mood or to make your relationship with them closer.
 When replying, you should keep the conversation warm and natural, with a casual, everyday feel. Natural and friendly replies usually:
 1. Are brief, casual, and natural, using everyday words or phrases; grammar can be flexible.
