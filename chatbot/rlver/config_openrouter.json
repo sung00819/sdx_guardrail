@@ -27,6 +27,8 @@
     "max_turns": 8
   },
   "reward": {
-    "format_zero": true
+    "format_zero": true,
+    "repeat_similarity": 0.8,
+    "repeat_penalty": 0.1
   }
 }

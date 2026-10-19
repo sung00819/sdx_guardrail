@@ -48,6 +48,7 @@ def summarize(eps):
             "failure": sum(e["final_emotion"] < 10 for e in eps) / n,
             "reward": sum(e["reward"] for e in eps) / n,
             "format_fail": sum(not e["format_ok"] for e in eps) / n,
+            "repeat_turns": sum(e.get("repeats", 0) for e in eps) / max(1, sum(len(e["turns"]) - 1 for e in eps)),
             "turns": sum(len(e["turns"]) - 1 for e in eps) / n,
             "by_cell": mean_by([{**e, "cell": f"{e.get('event')}·{e.get('disclosure')}"} for e in eps], "cell"),
             "by_need": mean_by(eps, "need"),
@@ -56,7 +57,8 @@ def summarize(eps):
 
 def print_summary(s):
     print(f"대화 {s['episodes']} · Score {s['score']:.1f} · Success {s['success']:.0%} · Failure {s['failure']:.0%}"
-          f" · 보상 {s['reward']:.3f} · 형식 위반 {s['format_fail']:.0%} · 평균 턴 {s['turns']:.1f}")
+          f" · 보상 {s['reward']:.3f} · 형식 위반 {s['format_fail']:.0%} · 반복 턴 {s.get('repeat_turns', 0):.0%}"
+          f" · 평균 턴 {s['turns']:.1f}")
     for t, v in {**s["by_cell"], **s["by_need"], **s["by_stance"]}.items():
         print(f"  {v:5.1f}  {t}")
 

@@ -122,6 +122,7 @@ def stats(ep_path):
     return {"episodes": len(eps), "reward": sum(e["reward"] for e in eps) / n,
             "score": sum(e["final_emotion"] for e in eps) / n,
             "format_fail": sum(not e["format_ok"] for e in eps) / n,
+            "repeat_turns": sum(e.get("repeats", 0) for e in eps) / max(1, sum(len(e["turns"]) - 1 for e in eps)),
             "success": sum(e["end"] == "success" for e in eps) / n,
             "failure": sum(e["end"] == "failure" for e in eps) / n}
 
@@ -143,6 +144,7 @@ def main():
     run_dir = os.path.join(ROOT, "out", "rlver_rl", args.run)
     os.makedirs(run_dir, exist_ok=True)
     train_ids = sorted(bg["id"] for bg in read(BACKGROUNDS) if bg["split"] == "train")
+    sims_up()  # 앞 실행이 학습 중에 끊겼으면 GPU 3–6 시뮬레이터가 내려가 있다
     wait_up([18601, 18602] + [p for _, _, p in SIMS])
 
     for it in range(1, args.iters + 1):

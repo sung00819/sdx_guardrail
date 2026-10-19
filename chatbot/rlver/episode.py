@@ -2,8 +2,10 @@
 
 끝: 감정 ≥ end_high (만족, Success) · 감정 < end_low (떠남, Failure) · 챗봇 max_turns 턴.
 보상 r = max(e_T, 0) / 100. think 템플릿에서 한 턴이라도 형식을 어기면 0 (논문 2.3절 format reward).
+반복 패널티: 이전 챗봇 답과 단어 유사도 ≥ repeat_similarity 인 턴마다 r 에서 repeat_penalty 를 뺀다 (음수가 될 수 있다).
 """
 
+import difflib
 import re
 
 import bank as strategy_bank
@@ -37,6 +39,13 @@ def parse_bot(raw, template):
     ok = bool(m) and "<think>" not in m.group(2) and "</think>" not in m.group(2)
     reply, leaked = strip_plan(raw.split("</think>")[-1].replace("<think>", "").strip())
     return reply, ok and not leaked
+
+
+def max_similarity(reply, previous):
+    """reply 와 이전 답들 중 가장 비슷한 것의 유사도 (0~1). 단어 단위 difflib, autojunk 끔 (../sim/textsim.py 와 같은 계산)"""
+    w = reply.lower().split()
+    return max((difflib.SequenceMatcher(None, w, p.lower().split(), autojunk=False).ratio() for p in previous if p),
+               default=0.0)
 
 
 def system_prompt(profile, template, native=False):
@@ -76,6 +85,18 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
     reward = max(user.emotion, 0) / 100
     if template in THINK_TEMPLATES and cfg["reward"].get("format_zero", True) and not format_ok:
         reward = 0.0
+    # 반복 패널티 (2026-10-19 사용자 결정): 감정 체계는 그대로 두고 챗봇 보상에서 직접 뺀다.
+    # 이전 챗봇 답과 단어 유사도가 문턱 이상인 턴마다 repeat_penalty (같은 답 6번에도 감정은 −2~−4 였다, eval_bank_8b)
+    rc, bots = cfg["reward"], []
+    n_repeat = 0
+    for t in turns:
+        if "bot" not in t:
+            continue
+        t["repeat_similarity"] = round(max_similarity(t["bot"], bots), 3)
+        t["repeated"] = t["repeat_similarity"] >= rc.get("repeat_similarity", 1.01)
+        n_repeat += t["repeated"]
+        bots.append(t["bot"])
+    reward -= rc.get("repeat_penalty", 0.0) * n_repeat
     return {"id": profile["id"], "task": profile.get("task"), "event": profile.get("event"), "disclosure": profile.get("disclosure"),
             "template": template, "turns": turns,
-            "final_emotion": user.emotion, "end": end, "format_ok": format_ok, "reward": reward}
+            "final_emotion": user.emotion, "end": end, "format_ok": format_ok, "repeats": n_repeat, "reward": reward}

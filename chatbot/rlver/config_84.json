@@ -52,6 +52,8 @@
   },
   "reward": {
     "format_zero": true,
-    "_doc": "r = max(e_T, 0)/100. think 템플릿에서 형식을 어긴 턴이 있으면 0"
+    "repeat_similarity": 0.8,
+    "repeat_penalty": 0.1,
+    "_doc": "r = max(e_T, 0)/100. think 템플릿에서 형식을 어긴 턴이 있으면 0. 이전 챗봇 답과 단어 유사도 0.8 이상인 턴마다 −0.1 (2026-10-19, 감정은 그대로)"
   }
 }
