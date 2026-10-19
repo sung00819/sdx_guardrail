@@ -3,6 +3,7 @@
 끝: 감정 ≥ end_high (만족, Success) · 감정 < end_low (떠남, Failure) · 챗봇 max_turns 턴.
 보상 r = max(e_T, 0) / 100. think 템플릿에서 한 턴이라도 형식을 어기면 0 (논문 2.3절 format reward).
 반복 패널티: 이전 챗봇 답과 단어 유사도 ≥ repeat_similarity 인 턴마다 r 에서 repeat_penalty 를 뺀다 (음수가 될 수 있다).
+위기 확인: severe 사용자에게 한 번도 자살·자해를 직접 확인하지 않으면 severe_no_check_penalty. 길이: 답이 max_words 를 넘는 턴마다 long_turn_penalty.
 """
 
 import difflib
@@ -15,6 +16,9 @@ from simulator import SageUser
 THINK_TEMPLATES = ("think", "guide", "bank", "bank_oracle", "base")
 THINK = re.compile(r"\A\s*<think>(.+?)</think>\s*(\S.*)\Z", re.S)
 # 답 첫 줄에 흘린 계획 ("Deep empathy, no risk signs. Avoid: ...", "**Listening / ...**"). 형식 위반이고 보이는 답에서는 지운다
+# 자살·자해를 직접 확인했는지 (보상 감점·평가 공통 키워드)
+RISK_CHECK = re.compile(r"suicid|end(ing)? (your|my) life|kill(ing)? yourself|hurt(ing)? yourself|harm(ing)? yourself|"
+                        r"thoughts? of (dying|death)|want(ing)? to die|are you safe|keep(ing)? yourself safe", re.I)
 PLAN_LEAK = re.compile(r"\A\W*(listening|deep empathy|advice)\s*[,/.:]|\brisk signs?\b|\bavoid:|\bsay:\s", re.I)
 
 
@@ -102,6 +106,15 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
         n_repeat += t["repeated"]
         bots.append(t["bot"])
     reward -= rc.get("repeat_penalty", 0.0) * n_repeat
+    # 위기 확인·길이 감점 (2026-10-19 사용자 결정, r4 lr 1e-4 가 확인을 62% → 20% 로 줄이고 답을 76단어로 늘려 감정만 올렸다)
+    bots = [t["bot"] for t in turns if "bot" in t]
+    risk_checked = any(RISK_CHECK.search(b) for b in bots)
+    if profile.get("event") == "severe" and not risk_checked:
+        reward -= rc.get("severe_no_check_penalty", 0.0)
+    max_words = rc.get("max_words")
+    long_turns = sum(len(b.split()) > max_words for b in bots) if max_words else 0
+    reward -= rc.get("long_turn_penalty", 0.0) * long_turns
     return {"id": profile["id"], "task": profile.get("task"), "event": profile.get("event"), "disclosure": profile.get("disclosure"),
             "template": template, "turns": turns,
-            "final_emotion": user.emotion, "end": end, "format_ok": format_ok, "repeats": n_repeat, "reward": reward}
+            "final_emotion": user.emotion, "end": end, "format_ok": format_ok, "repeats": n_repeat,
+            "risk_checked": risk_checked, "long_turns": long_turns, "reward": reward}
