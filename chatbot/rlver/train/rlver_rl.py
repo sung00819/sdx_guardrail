@@ -26,16 +26,31 @@ sys.path.insert(0, RLVER)
 from backgrounds import OUT as BACKGROUNDS, read  # noqa: E402
 from compose import SETTINGS  # noqa: E402
 
-PY = "/data2/yumin/env/bin/python"  # 롤아웃 (vLLM 공용 env)
-TRAIN_ENV = "/data2/yumin/train_env"  # env + peft·accelerate (--system-site-packages)
-HF = "/data2/yumin/hf"
 BASE = "Qwen/Qwen3-8B"
-POLICY = "http://localhost:18602"
-TRAIN_GPUS = "0,1,3,4,5,6"  # 학습 동안 시뮬레이터 3대를 다 내리고 6장 (2026-10-19 사용자: GPU 최대한). GPU 2 정책 서버는 그대로
-# 학습 동안 내리는 시뮬레이터 (tmux 창 이름, 실행 스크립트, 포트)
-SIMS = [("sim", "/data2/yumin/serve_30b.sh", 18601), ("sim_b", "/data2/yumin/serve_30b_b.sh", 18603),
-        ("sim_c", "/data2/yumin/serve_30b_c.sh", 18604)]
-TMUX = "yumin_rlver"
+# 서버별 설정 (--host). sims = 학습 동안 내리는 시뮬레이터 (tmux 창 이름, 띄우는 명령, 포트), policies = 런타임 LoRA 정책 서버
+HOSTS = {
+    "84": {  # 3090 × 7: 시뮬레이터 3대 (TP2) + 정책 GPU 2, 학습 6장 (2026-10-19 사용자: GPU 최대한)
+        "py": "/data2/yumin/env/bin/python", "train_env": "/data2/yumin/train_env", "hf": "/data2/yumin/hf",
+        "logs": "/data2/yumin/logs", "tmux": "yumin_rlver", "config": "config_84_one.json",
+        "policies": ["http://localhost:18602"], "train_gpus": "0,1,3,4,5,6",
+        "sims": [("sim", "bash /data2/yumin/serve_30b.sh", 18601), ("sim_b", "bash /data2/yumin/serve_30b_b.sh", 18603),
+                 ("sim_c", "bash /data2/yumin/serve_30b_c.sh", 18604)]},
+    "43": {  # Ada 48GB × 6 + A100: 시뮬레이터 5대 GPU 0–4 (한 장씩), 정책 2대 GPU 5·6 (A100 은 FP8 30B 가 안 뜬다), 학습 GPU 0–4
+        "py": "/home/minseok/.conda/envs/vllm_qwen/bin/python", "train_env": "/home/minseok/yumin/train_env",
+        "hf": "/home/minseok/yumin/hf", "logs": "/home/minseok/yumin/logs", "tmux": "yumin_eval", "config": "config_43.json",
+        "policies": ["http://localhost:18611", "http://localhost:18612"], "train_gpus": "0,1,2,3,4",
+        "sims": [(f"sim{g}", f"bash /home/minseok/yumin/serve.sh {g} Qwen/Qwen3-30B-A3B-Instruct-2507-FP8 {18601 + g}", 18601 + g)
+                 for g in range(5)]},
+}
+PY = TRAIN_ENV = HF = LOGS = TMUX = CONFIG = TRAIN_GPUS = None
+POLICIES, SIMS = [], []
+
+
+def set_host(name):
+    global PY, TRAIN_ENV, HF, LOGS, TMUX, CONFIG, TRAIN_GPUS, POLICIES, SIMS
+    h = HOSTS[name]
+    PY, TRAIN_ENV, HF, LOGS, TMUX = h["py"], h["train_env"], h["hf"], h["logs"], h["tmux"]
+    CONFIG, TRAIN_GPUS, POLICIES, SIMS = os.path.join(RLVER, h["config"]), h["train_gpus"], h["policies"], h["sims"]
 
 
 def sh(cmd, check=False):
@@ -73,18 +88,20 @@ def sims_down():
 
 
 def sims_up():
-    for win, script, port in SIMS:
+    for win, cmd, port in SIMS:
         if not up(port):
             sh(f"tmux kill-window -t {TMUX}:{win} 2>/dev/null")
-            sh(f"tmux new-window -d -t {TMUX} -n {win} 'bash {script} 2>&1 | tee -a /data2/yumin/logs/rlver_{win}.log'")
+            sh(f"tmux new-window -d -t {TMUX} -n {win} '{cmd} 2>&1 | tee -a {LOGS}/rlver_{win}.log'")
     wait_up([p for _, _, p in SIMS])
 
 
 def adapter(name, path=None):
-    """정책 서버에 런타임 어댑터 올리기 (path) / 내리기"""
+    """정책 서버 모두에 런타임 어댑터 올리기 (path) / 내리기. 올리기는 모두 성공해야 'Success'"""
     body = {"lora_name": name, **({"lora_path": path} if path else {})}
     ep = "load_lora_adapter" if path else "unload_lora_adapter"
-    return sh(f"curl -s -m 120 -X POST {POLICY}/v1/{ep} -H 'Content-Type: application/json' -d '{json.dumps(body)}'").stdout
+    outs = [sh(f"curl -s -m 120 -X POST {p}/v1/{ep} -H 'Content-Type: application/json' -d '{json.dumps(body)}'").stdout
+            for p in POLICIES]
+    return "Success" if path and all("Success" in o for o in outs) else " | ".join(outs)
 
 
 def pick(train_ids, n, rng):
@@ -136,17 +153,18 @@ def main():
     ap.add_argument("--samples", type=int, default=4, help="GRPO 그룹 크기 (rollout.n)")
     ap.add_argument("--temperature", type=float, default=1.0, help="RLVER rollout.temperature")
     ap.add_argument("--workers", type=int, default=128)
-    ap.add_argument("--config", default=os.path.join(RLVER, "config_84_one.json"))
+    ap.add_argument("--host", default="84", choices=list(HOSTS), help="서버 설정 (HOSTS)")
     ap.add_argument("--template", default="bank")
     ap.add_argument("--lr", type=float, default=1e-5, help="LoRA (gym 과 같은 값; RLVER 1e-6 은 전체 미세조정)")
     ap.add_argument("--train_args", default="")
     args = ap.parse_args()
+    set_host(args.host)
 
     run_dir = os.path.join(ROOT, "out", "rlver_rl", args.run)
     os.makedirs(run_dir, exist_ok=True)
     train_ids = sorted(bg["id"] for bg in read(BACKGROUNDS) if bg["split"] == "train")
     sims_up()  # 앞 실행이 학습 중에 끊겼으면 시뮬레이터가 내려가 있다
-    wait_up([18602] + [p for _, _, p in SIMS])
+    wait_up([int(p.rsplit(":", 1)[1]) for p in POLICIES] + [p for _, _, p in SIMS])
 
     for it in range(1, args.iters + 1):
         tag, prev = f"it{it:03d}", (f"it{it - 1:03d}" if it > 1 else None)
@@ -167,7 +185,7 @@ def main():
                 raise RuntimeError(f"어댑터 올리기 실패: {out[:300]}")
         roll = os.path.join(d, "rollout")
         print(f"[{tag}] 롤아웃 (정책 {model})", flush=True)
-        subprocess.run([PY, "-u", os.path.join(RLVER, "run.py"), "--config", args.config, "--chatbot", "qwen3-8b",
+        subprocess.run([PY, "-u", os.path.join(RLVER, "run.py"), "--config", CONFIG, "--chatbot", "qwen3-8b",
                         "--model", model, "--template", args.template, "--split", "train", "--pairs", pairs_path,
                         "--samples", str(args.samples), "--temperature", str(args.temperature),
                         "--workers", str(args.workers), "--out", roll],
@@ -199,6 +217,10 @@ def main():
             sims_up()
             if r.returncode != 0 or not os.path.exists(os.path.join(out_dir, "step_stats.json")):
                 raise RuntimeError(f"학습 실패, {os.path.join(d, 'train.log')}")
+        if prev:  # 이어서 학습할 때는 최신 optimizer 만 필요하다 (반복마다 350MB, 43번 디스크 97%)
+            old_opt = os.path.join(run_dir, prev, "adapter", "optimizer.pt")
+            if os.path.exists(old_opt):
+                os.remove(old_opt)
         step = json.load(open(os.path.join(out_dir, "step_stats.json")))
         print(f"[{tag}] 학습 {json.dumps(step)}", flush=True)
         with open(os.path.join(run_dir, "log.jsonl"), "a") as f:

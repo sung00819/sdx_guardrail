@@ -16,7 +16,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--episodes", required=True)
     ap.add_argument("--out", default=os.path.join(rl.ROOT, "out", "rlver_rl", "smoke"))
+    ap.add_argument("--host", default="84", choices=list(rl.HOSTS))
     args = ap.parse_args()
+    rl.set_host(args.host)
     os.makedirs(args.out, exist_ok=True)
     eps = [json.loads(l) for l in open(args.episodes)]
     turns = sorted((t for e in eps for t in e["turns"] if "bot_raw" in t),
@@ -44,7 +46,7 @@ def main():
         raise SystemExit(f"SMOKE_FAIL 어댑터 ({out[:300]})")
     body = json.dumps({"model": "rlver_smoke", "messages": turns[0]["prompt"], "max_tokens": 300})
     open(os.path.join(args.out, "req.json"), "w").write(body)
-    ans = rl.sh(f"curl -s -m 300 {rl.POLICY}/v1/chat/completions -H 'Content-Type: application/json' "
+    ans = rl.sh(f"curl -s -m 300 {rl.POLICIES[0]}/v1/chat/completions -H 'Content-Type: application/json' "
                 f"-d @{os.path.join(args.out, 'req.json')}").stdout
     rl.adapter("rlver_smoke")
     if '"choices"' not in ans:
