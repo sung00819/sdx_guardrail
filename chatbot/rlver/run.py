@@ -82,8 +82,9 @@ def main():
     ap.add_argument("--chatbot", default="qwen2.5-7b", help="config chatbots 의 이름")
     ap.add_argument("--model", help="챗봇 model 이름을 바꾼다 (vLLM 런타임 LoRA 어댑터 이름)")
     ap.add_argument("--temperature", type=float)
-    ap.add_argument("--template", choices=["bank", "bank_oracle", "base", "guide", "think", "nothink", "sage"], default="bank",
-                    help="bank = 전략 뱅크 (STRATEGY.md), base = bank 에서 뱅크만 뺀 것, bank_oracle = 원하는 방식·위험을 알려 준 상한, guide = 짧은 지침, think·nothink = RLVER 원래")
+    ap.add_argument("--template", choices=["bank", "bank_jev", "bank_oracle", "base", "guide", "think", "nothink", "sage"], default="bank",
+                    help="bank = 전략 뱅크 (STRATEGY.md), bank_jev = 턴마다 Jev 13축으로 1025)bank.json 모듈 조합, base = bank 에서 뱅크만 뺀 것, bank_oracle = 원하는 방식·위험을 알려 준 상한, guide = 짧은 지침, think·nothink = RLVER 원래")
+    ap.add_argument("--judge", default="jev", choices=["jev", "kev", "clm"], help="bank_jev 판정기")
     ap.add_argument("--samples", type=int, default=1, help="프로필마다 대화 수 (GRPO 그룹 크기)")
     ap.add_argument("--no_first_talk", action="store_true", help="테스트 프로필의 고정 첫 발화 대신 시뮬레이터가 연다")
     ap.add_argument("--workers", type=int, default=32)
@@ -101,6 +102,10 @@ def main():
     if args.temperature is not None:
         bot_cfg["temperature"] = args.temperature
     bot, sim = Chat(bot_cfg), Chat(cfg["simulator"])
+    judge = None
+    if args.template == "bank_jev":
+        from jev import Jev
+        judge = Jev(args.judge, workers=args.workers)
     if args.profiles:
         profiles = [json.loads(l) for l in open(args.profiles)]
     else:
@@ -130,7 +135,7 @@ def main():
 
     def one(job):
         p, s = job
-        ep = run_episode(p, bot, sim, cfg, args.template, use_first_talk=not args.no_first_talk)
+        ep = run_episode(p, bot, sim, cfg, args.template, use_first_talk=not args.no_first_talk, jev=judge)
         extra = {k: p.get(k) for k in ("setting", "need", "stance", "effort")}  # event·disclosure 는 episode 가 넣는다
         return {**ep, **extra, "sample": s, "chatbot": bot_cfg["model"]}
 
@@ -151,6 +156,8 @@ def main():
     s = summarize(load_episodes(args.out))
     json.dump(s, open(os.path.join(args.out, "summary.json"), "w"), indent=1, ensure_ascii=False)
     print_summary(s)
+    if judge:
+        print(f"Jev 비용 ${judge.cost:.3f}")
 
 
 if __name__ == "__main__":

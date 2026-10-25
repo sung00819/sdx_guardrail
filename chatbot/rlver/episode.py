@@ -14,7 +14,7 @@ import bank as strategy_bank
 from prompts import CHATBOT, REPLY_FORMAT, TAG_FORMAT, TAG_REPLY
 from simulator import SageUser
 
-THINK_TEMPLATES = ("think", "guide", "bank", "bank_oracle", "base")
+THINK_TEMPLATES = ("think", "guide", "bank", "bank_oracle", "base", "bank_jev")
 THINK = re.compile(r"\A\s*<think>(.+?)</think>\s*(\S.*)\Z", re.S)
 # 답 첫 줄에 흘린 계획 ("Deep empathy, no risk signs. Avoid: ...", "**Listening / ...**"). 형식 위반이고 보이는 답에서는 지운다
 # 자살·자해를 직접 확인했는지 (보상 감점·평가 공통 키워드)
@@ -62,19 +62,42 @@ def system_prompt(profile, template, native=False):
         return strategy_bank.assemble_base(strategy_bank.load(), native)
     if template == "bank_oracle":
         return strategy_bank.assemble(strategy_bank.load(), profile.get("need"), profile.get("event"), native)
+    if template == "bank_jev":  # 턴마다 Jev 로 다시 조합하므로 첫 턴 전 자리표시 (run_episode 가 바꾼다)
+        return ""
     text = CHATBOT[template]
     if TAG_REPLY in text:  # think·guide: bank 와 같은 답 형식 (생각 100단어 · 답 40단어, 자체 생각 모델이면 native)
         text = text.replace(TAG_FORMAT, "").replace(TAG_REPLY, REPLY_FORMAT["native" if native else "tags"])
     return text
 
 
-def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=True):
+def jev_route(messages, jev, state, native=False):
+    """bank_jev (2026-10-25): 사용자 최근 발화 3개 → Jev 13축 P(예) + 원하는 방식 → 0/1 → 1025)bank.json 모듈 조합.
+    state: 대화 동안 유지 {"need": 잡힌 방식 (바뀌면 갱신), "offered": 정서 모듈이 이미 들어갔는지}"""
+    probs, need = jev.judge(messages)
+    if need:
+        state["need"] = need
+    on = strategy_bank.fired(probs)
+    route = strategy_bank.route(on)
+    text = strategy_bank.assemble_route(strategy_bank.load(strategy_bank.BANK_1025), on, need=state["need"], native=native,
+                                        offered=state["offered"])
+    state["offered"] = state["offered"] or route["emotional"]
+    return text, probs, {**route, "need": state["need"], "need_now": need}
+
+
+def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=True, jev=None):
+    """jev: template bank_jev 일 때 jev.Jev (판정기)"""
     emo, ep = cfg["emotion"], cfg["episode"]
+    assert template != "bank_jev" or jev is not None, "bank_jev 는 jev 판정기가 필요하다"
     user = SageUser(profile, sim_llm, emo)
     first, first_thinking = user.open(profile.get("first_talk") if use_first_talk else None)
     messages = [{"role": "system", "content": system_prompt(profile, template, getattr(bot, "native_think", False))}, {"role": "user", "content": first}]
     turns, end = [{"user": first, "user_thinking": first_thinking, "emotion": user.emotion}], "max_turns"
+    native = getattr(bot, "native_think", False)
+    jev_state = {"need": None, "offered": False}
     for _ in range(ep["max_turns"]):
+        if template == "bank_jev":
+            messages[0]["content"], probs, route = jev_route(messages, jev, jev_state, native)
+            turns[-1].update(jev={k: round(v, 3) for k, v in probs.items()}, route=route)
         raw = bot(messages)
         reply, ok = parse_bot(raw, template)
         if not reply:

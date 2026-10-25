@@ -50,7 +50,7 @@ class SageUser:
         self.history = []  # [{"role": "user"|"assistant", "content"}], user = 이 시뮬레이터
 
     def _format(self, template, **kw):
-        return template.format(purpose=PURPOSE, persona=self.p["persona"], background=self.p["background"],
+        return template.format(purpose=self.p.get("purpose", PURPOSE), persona=self.p["persona"], background=self.p["background"],
                                history=dialog_json(self.history[:-2]) if len(self.history) > 2 else "[]",
                                latest=dialog_json(self.history[-2:]), **kw)
 
@@ -79,7 +79,7 @@ class SageUser:
     def reply(self, planning=None):
         """f_reply: 현재 감정 상태로 다음 발화"""
         if planning is None:
-            prompt = REPLY.format(purpose=PURPOSE, states=EMOTION_STATES, persona=self.p["persona"],
+            prompt = REPLY.format(purpose=self.p.get("purpose", PURPOSE), states=EMOTION_STATES, persona=self.p["persona"],
                                   background=self.p["background"], history=OPEN_HISTORY, latest="",
                                   planning=OPEN_PLANNING, state=emotion_state(self.emotion))
         else:
