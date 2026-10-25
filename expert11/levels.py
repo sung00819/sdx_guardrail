@@ -1,20 +1,26 @@
-"""expert11: 질문 답으로 급성 수준·만성 표지를 정한다 (전문가 자료 슬라이드 7·8).
+"""expert11: 질문 답으로 급성 수준·만성 표지를 정한다 (전문가 자료 슬라이드 7·8, 2차 검토 의견 R2).
 
-점수 질문은 Jev 점수가 k - 0.5 이상이면 k 단계 이상 (common/rules.py at_least), 예/아니오는 '예' 확률 ≥ 0.7.
+예/아니오는 '예' 확률 ≥ 0.7. 순서가 있는 선택형(실행 의도·자해 의도·빈도 등)은 위험 쪽 선택지 확률의 합 ≥ 0.5 (rules.has).
 시점은 0(해당 없음) 확률을 뺀 나머지로 다시 낸 평균 점수로 구간을 정한다 (common/rules.py recent).
-  시점 단계: 1 12개월보다 전 / 2 3~12개월 (행동·자해는 시점 불명 포함) / 3 1~3개월 / 4 1개월 안 (사고는 시점 불명 포함) / 5 지금
+  시점 단계: 1 12개월보다 전 / 2 3~12개월 / 3 1~3개월 / 4 1개월 안 (시점 불명 포함, t11f) / 5 지금
 
-  (의도·계획·준비는 자살 사고나 자살 행동이 함께 있을 때만 인정)
-  급성 고   자살 의도(약간 이상) + 사고 1개월 안 · 자살 행동(멈춤·저지 포함) 3개월 안 · 준비 행동 3개월 안
-            · 자살 의도 있는 자해 3개월 안 · 안전 유지 불가 표명
-  급성 중   방법을 생각하는 사고(의도 없음) 1개월 안 · 계획 있음(의도 없음) 1개월 안
-            · 자살 행동·준비 행동 3~12개월 전 또는 시점 불명 · 자해 행동 12개월 안(시점 불명 포함)
-  급성 저   죽고 싶은 소망·비특이적 능동적 사고 1개월 안 · 간접 경고신호 · 자해 충동만
-  상향      급성 중 + 수단 접근 → 고, 급성 저 + 급성 위험 맥락 → 중 (한 단계까지만)
-  만성 표지 자살 행동·준비 행동 12개월보다 전 · 자해 12개월보다 전 또는 반복·심함
-            · 1개월보다 전의 자살 사고·의도·계획 (시간 창이 지나면 삭제하지 않고 옮김) · 정신과 병력·위험요인
-  제외      신호가 있는데 다른 사람 이야기 (v4i subject=other, 신뢰도 ≥ 0.9)
+  (실행 의도·구체성·준비는 자살 사고나 자살 행동이 함께 있을 때만 인정)
+  급성 고   실행 의도(임박 또는 의도 표명) + 사고 1개월 안 · 자살 행동(실제·저지·중단) 3개월 안 · 준비 행동 3개월 안
+            · 자살 의도 또는 혼합 의도가 있는 자해 3개월 안 · 안전 유지 불가 표명
+  급성 중   구체적 계획(의도 없음) 1개월 안 · 방법 고려(의도 없음) 1개월 안
+            · 자살 행동·준비 행동 3~12개월 전 · 자해 행동 12개월 안
+  급성 저   비특이적 사고 1개월 안 · 간접 경고신호 · 우울 · 자해 충동만
+  상향      없음 (t11f). t11e 는 급성 중 + 수단 접근 → 고, 급성 저 + 급성 위험 맥락 → 중 이었다. 수단 접근·급성 맥락은
+            context·findings 에 기록만 하고, upgraded_by 는 항상 null 이다.
+  만성 표지 자살 행동·준비 행동 12개월보다 전 · 자해 12개월보다 전 · 반복·장기간·치료가 필요했던 자해
+            · 1개월보다 전의 자살 사고 (시간 창이 지나면 삭제하지 않고 옮김)
+            · 정신과·물질 사용 병력 · 물질 사용 장애 · 가까운 사람의 자살
+  자해 심각도가 낮다는 것으로 위험을 낮추지 않는다 (검토 의견 14). 보호요인은 기록만 하고 수준에 쓰지 않는다.
   대응      슬라이드 8 (common/rules.py RESPONSE)
+
+reasons·chronic 코드 이름은 t11e 와 같다 (챗봇 시뮬레이터·라벨 데이터가 쓴다). t11f 에서 시점 불명이 4 가 되어
+`*_3_12m_or_unknown` 은 이제 3~12개월만 뜻한다. 새로 생긴 코드: depressed_mood, substance_use_disorder, suicide_exposure.
+측정 항목별 사실(준비 유형, 자해 의도·빈도 등)은 findings() 로 따로 낸다.
 """
 
 import os
@@ -22,41 +28,44 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "common"))
-from rules import CONF, YES_PROB, at_least, pick_level, recent, upgrade  # noqa: E402
+from rules import YES_PROB, has, pick_level, recent, top  # noqa: E402
+
+UNKNOWN_TIME = 4  # 시점 불명은 1개월 안 (문서 4번 원문)
+
+
+def _yes(a, q):
+    return (a.get(q) or 0) >= YES_PROB
 
 
 def judge_level(a):
     """a = 모든 판정기 답을 합친 dict. 반환: (급성 수준, 만성 표지 목록, 근거 목록)"""
     hits = defaultdict(list)
     chronic = []
-    on = lambda q, k: at_least(a, q, k)  # noqa: E731
-    yes = lambda q: (a.get(q) or 0) >= YES_PROB  # noqa: E731
-    t = lambda q, k: recent(a, q, k, unknown=4 if q == "t_ideation" else 2)  # noqa: E731  시점 불명: 사고 1개월 안, 나머지 3~12개월
+    yes = lambda q: _yes(a, q)  # noqa: E731
+    t = lambda q, k: recent(a, q, k, unknown=UNKNOWN_TIME)  # noqa: E731
 
-    # 의도·계획·준비는 자살 사고나 자살 행동이 함께 잡혔을 때만 인정한다 (2026-10-07).
+    # 실행 의도·구체성·준비는 자살 사고나 자살 행동이 함께 잡혔을 때만 인정한다 (2026-10-07).
     # 앞 대화 없는 한 문장("I will do it tonight", "폭발물을 사고 싶어")에서 무엇을 하겠다는 건지 모르는 채로
-    # 자살 의도·준비가 되는 것을 막는다. 자살 사고 없이 의도·준비만 있는 경우는 실제로 드물다.
-    suicidal = on("suicide_ideation", 1) or on("suicide_behavior", 1)
-    _on = on
-    on = lambda q, k: _on(q, k) and (suicidal or q not in ("suicide_intent", "suicide_plan", "preparation"))  # noqa: E731
+    # 자살 의도·준비가 되는 것을 막는다.
+    suicidal = yes("suicidal_ideation") or yes("suicide_behavior")
 
-    # 2·3·5 사고·의도·계획: 1개월 창
-    thought = on("suicide_ideation", 1) or on("suicide_intent", 1) or on("suicide_plan", 1)
-    if thought and t("t_ideation", 4):
-        if on("suicide_intent", 1):
-            hits["high"].append("suicidal_ideation_active_intent")
-        elif on("suicide_plan", 2):  # 시기·장소까지 구체화
-            hits["moderate"].append("suicidal_ideation_plan")
-        elif on("suicide_ideation", 3) or on("suicide_plan", 1):  # 방법만 = C-SSRS ③
-            hits["moderate"].append("suicidal_ideation_method")
-        if on("suicide_ideation", 1) and not on("suicide_ideation", 3):
-            hits["low"].append("suicidal_ideation_passive")
-    elif thought:
-        chronic.append("suicidal_ideation_over_1m")
+    # 5 사고·구체성·실행 의도: 1개월 창
+    if yes("suicidal_ideation"):
+        if t("t_ideation", 4):
+            if has(a, "suicidal_intent", "imminent", "intent"):  # 검토 의견 21: 계획 유무와 상관없이 실행 의도는 급성 고
+                hits["high"].append("suicidal_ideation_active_intent")
+            elif yes("ideation_plan"):
+                hits["moderate"].append("suicidal_ideation_plan")
+            elif yes("ideation_method"):
+                hits["moderate"].append("suicidal_ideation_method")
+            else:
+                hits["low"].append("suicidal_ideation_passive")
+        else:
+            chronic.append("suicidal_ideation_over_1m")
 
-    # 1·4 자살 행동·준비 행동: 3개월(고) / 12개월(중) 창
+    # 1·2 자살 행동·준비 행동: 3개월(고) / 12개월(중) 창
     for q, tq, name in (("suicide_behavior", "t_behavior", "suicidal_behavior"), ("preparation", "t_preparation", "preparation")):
-        if on(q, 1):
+        if yes(q) and (suicidal or q == "suicide_behavior"):
             if t(tq, 3):
                 hits["high"].append(f"{name}_within_3m")
             elif t(tq, 2):
@@ -64,27 +73,69 @@ def judge_level(a):
             else:
                 chronic.append(f"{name}_over_12m")
 
-    # 6 자해: 12개월 창. 자살 의도가 확인되면 자살 행동으로 본다
-    if on("sh_level", 2):
-        suicidal = a.get("sh_intent") == "suicidal" and (a.get("sh_intent_conf") or 0) >= CONF
-        if suicidal and t("t_self_harm", 3):
+    # 3 자해: 12개월 창. 자살 의도나 혼합 의도가 있으면 자살 행동으로 본다 (검토 의견 12: 혼합은 더 높은 쪽으로)
+    if yes("self_harm"):
+        if has(a, "sh_intent", "suicidal", "ambivalent_or_mixed") and t("t_self_harm", 3):
             hits["high"].append("self_harm_suicidal_within_3m")
         elif t("t_self_harm", 2):
             hits["moderate"].append("self_harm_within_12m_or_unknown")
         else:
             chronic.append("self_harm_over_12m")
-        if on("sh_level", 3):
+        if (has(a, "sh_frequency", "repeated") or has(a, "sh_duration", "sustained")
+                or has(a, "sh_severity", "medical_care", "life_threatening")):
             chronic.append("self_harm_severe")
-    elif on("sh_level", 1):
+    elif yes("sh_urge"):
         hits["low"].append("self_harm_urge")
 
-    # 7~11 맥락
+    # 6~10 맥락
     if yes("cannot_stay_safe"):
         hits["high"].append("unable_to_stay_safe")
     if yes("warning_signs"):
         hits["low"].append("indirect_warning")
-    if yes("psych_history"):
-        chronic.append("psychiatric_history")
+    if yes("depressed_mood"):
+        hits["low"].append("depressed_mood")
+    for q, code in (("psych_history", "psychiatric_history"), ("substance_use_disorder", "substance_use_disorder"),
+                    ("suicide_exposure", "suicide_exposure")):
+        if yes(q):
+            chronic.append(code)
 
-    level, reasons = upgrade(*pick_level(hits), a)  # 가장 높은 기준 + 한 단계까지만 상향
+    level, reasons = pick_level(hits)  # 가장 높은 기준. t11f 는 맥락 요인으로 올리지 않는다 (측정 항목 표에 상향이 없음)
     return level, chronic, reasons
+
+
+# 측정 항목별 사실: 시점·수준과 상관없이 Jev 가 본 것. (질문, 상위 예/아니오 질문, 코드 접두어, 뺄 선택지)
+_FACT_CHOICES = (
+    ("attempt_type", "suicide_behavior", "attempt", ("no_attempt",)),
+    ("suicidal_intent", "suicidal_ideation", "intent", ("no_intent", "ambivalent_or_unclear")),
+    ("ideation_duration", "suicidal_ideation", "ideation", ("no_ideation", "unclear", "brief_or_isolated")),
+    ("sh_intent", "self_harm", "self_harm", ("no_self_harm",)),
+    ("sh_severity", "self_harm", "self_harm", ("no_self_harm", "unclear")),
+    ("sh_frequency", "self_harm", "self_harm", ("no_self_harm", "unclear", "once")),
+    ("sh_duration", "self_harm", "self_harm", ("no_self_harm", "unclear", "single_or_short")),
+)
+# 예/아니오로 나눈 하위 질문: (질문, 상위 질문, 코드). 상위 질문이 '예'일 때만 센다
+_FACT_SUB = (
+    ("prep_obtain_means", "preparation", "preparation_obtain_means"),
+    ("prep_suicide_note", "preparation", "preparation_suicide_note"),
+    ("prep_affairs", "preparation", "preparation_put_affairs_in_order"),
+    ("ideation_plan", "suicidal_ideation", "ideation_specific_plan"),
+    ("ideation_method", "suicidal_ideation", "ideation_method"),
+)
+_FACT_YES = ("suicide_behavior", "preparation", "self_harm", "sh_urge", "suicidal_ideation", "cannot_stay_safe",
+             "means_access", "warning_signs", "depressed_mood", "protective_factors", "acute_context",
+             "psych_history", "substance_use_disorder", "suicide_exposure")
+
+
+def findings(a):
+    """측정 항목 표의 사실 코드 목록. 한 발화에 여러 칸이 함께 있으면 모두 낸다 (예: 약을 모으고 유서도 씀 →
+    preparation_obtain_means, preparation_suicide_note). 예: self_harm_non_suicidal(자살 의도 없는 자해),
+    self_harm_repeated(반복적 자해), ideation_specific_plan(구체적 계획), ideation_method(방법 고려), depressed_mood(우울)"""
+    out = [q for q in _FACT_YES if _yes(a, q)]
+    out += [code for q, parent, code in _FACT_SUB if _yes(a, parent) and _yes(a, q)]
+    if "ideation_specific_plan" in out and "ideation_method" not in out:  # 구체적 계획은 방법 고려를 포함한다
+        out.append("ideation_method")
+    for q, parent, prefix, skip in _FACT_CHOICES:
+        value = top(a, q)
+        if _yes(a, parent) and value and value not in skip:
+            out.append("intent_stated" if value == "intent" else f"{prefix}_{value}")
+    return out

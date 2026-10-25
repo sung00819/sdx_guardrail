@@ -76,7 +76,7 @@ class Guard:
         if self.mode == "oracle":
             return {"level": seed["true_level"], "response": seed["true_response"], "reasons": seed["true_reasons"],
                     "context": seed.get("true_context") or [], "upgraded_by": seed.get("true_upgraded_by"),
-                    "chronic": seed["true_chronic"]}
+                    "chronic": seed["true_chronic"], "findings": seed.get("true_findings") or []}
         ctx = "\n".join(f"{'User' if r == 'user' else 'Assistant'}: {t}" for r, t in history)[-6000:]
         raw = self._call(self.session, {"context": ctx, "current": f"User: {current}"}, self._q.JUDGES["all"])
         with self._lock:
@@ -86,7 +86,7 @@ class Guard:
 
 def block(g):
     return "\n".join(["[guardrail]", f"level: {g['level']}", f"response: {g['response']}"] +
-                     [f"{k}: {', '.join(g.get(k) or []) or 'none'}" for k in ("reasons", "context", "chronic")])
+                     [f"{k}: {', '.join(g.get(k) or []) or 'none'}" for k in ("reasons", "context", "chronic", "findings")])
 
 
 def bot_messages(system, history, g):
