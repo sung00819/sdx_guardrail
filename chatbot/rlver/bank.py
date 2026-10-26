@@ -77,15 +77,96 @@ def route(on):
 FOLLOW = ("They have already shown how they want you to respond: {label}. Keep responding this way in every reply. Do not ask "
           "again how they want to talk, whether they want to say more, or whether they would rather do something else; switch "
           "only if they clearly ask for something different.")
-OFFERED = ("You have already offered them a choice of how to talk earlier in this conversation. Do not offer it again or ask "
-           "what would help; keep listening (Listening is the safe default) and follow whatever they show.")
+OFFER = ("This is your first reply to their low mood. After briefly reflecting what they said, offer them in one warm, plain "
+         "sentence three ways to go on: letting it out while you listen, you really trying to understand what it is like for "
+         "them, or thinking together about what to do. Let them choose; do not number or label the options.")
+OFFERED = ("You already offered them a choice of how to talk. Do not offer it again or ask what would help; keep listening "
+           "(Listening is the safe default) and follow whatever they show.")
+
+# 계획 칸 (bank_jev_plan, 2026-10-26): 해야 할 일은 Jev·뱅크로 코드가 채우고, 근거·질문·피할 것은 모델이 채운다
+SIGNAL = {"obtain_means": "got or looked for means", "suicide_note": "wrote a suicide note", "put_affairs_in_order": "putting affairs in order",
+          "specific_plan": "a specific suicide plan (time or place)", "nonsuicidal_self_harm": "self-harm without intent to die",
+          "repeated_self_harm": "repeated self-harm", "cannot_stay_safe": "cannot keep themselves safe", "means_access": "lethal means at hand",
+          "method": "thinking about a method", "depression": "low mood", "acute_context": "a major recent stressor",
+          "psych_history": "psychiatric history", "substance_use_disorder": "substance use problem"}
+MUST = {"obtain_means": "ask what they got and where it is now; help put distance from it",
+        "suicide_note": "say gently you take the note seriously; ask about a plan or a time",
+        "put_affairs_in_order": "ask directly whether they are getting ready to end their life",
+        "specific_plan": "ask whether they are alone; connect them with {CRISIS_LINE} now",
+        "nonsuicidal_self_harm": "ask whether they are hurt now; check separately for suicidal thoughts",
+        "repeated_self_harm": "ask whether they are hurt now and whether it has got worse lately; check for suicidal thoughts",
+        "cannot_stay_safe": "ask where they are and who can be with them; connect them with {CRISIS_LINE} now",
+        "means_access": "ask where the means is right now and help put it away",
+        "method": "ask directly about suicidal thoughts and any intent or plan",
+        "acute_context": "acknowledge the event; check for suicidal thoughts since it happened",
+        "substance_use_disorder": "check whether they have been drinking or using right now",
+        "psych_history": "ask what has helped before; suggest their doctor or therapist"}
+WANT = {"listen_vent": "Listening (let them get it out)", "deep_empathy": "Deep empathy (show you really get what it is like for them)",
+        "practical_advice": "Advice (one or two concrete options)"}
 
 
-def assemble_route(bank, on, need=None, native=False, offered=False):
+def plan_block(on, need=None, offer=False, fill=None, asked=False, where=False):
+    """<think> 앞부분. 코드가 채우는 줄 (Jev signals · They want · Must do) + 모델이 채울 빈 줄.
+    asked: 앞 답에서 이미 자살 생각을 직접 물었음 → 다시 묻지 말고 답을 따라가라 (2026-10-26: 30B 가 매 턴 되물었다)"""
+    r = route(on)
+    if r["general"]:  # 일반 대화 (normal 등): 방식은 묻지 않고 자연스럽게 (2026-10-26 사용자)
+        return "<think>\nWhat they want to talk about:\nHow I will respond to it (specific to their details):"
+    sig = [SIGNAL[k] for k in r["risk"] + (["depression"] if r["emotional"] else []) + r["mods"]]
+    ask = ("you already asked directly about suicidal thoughts; do not ask it again, follow up on their answer and the other steps"
+           if asked else "ask directly whether they are thinking about ending their life")
+    must = [MUST[k] for k in r["risk"]] + ([ask] if r["risk"] else []) + [MUST[k] for k in r["mods"]]
+    if asked:
+        must = [m.replace("ask directly about suicidal thoughts and any intent or plan", "ask about any intent or plan")
+                 .replace("; check separately for suicidal thoughts", "").replace("; check for suicidal thoughts", "")
+                 .replace("; check for suicidal thoughts since it happened", "") for m in must]
+    if offer:
+        want = "not known yet; this turn, offer the three ways once (listen / understand / think what to do)"
+    elif need:
+        want = WANT[need] + "; do not ask again how they want to talk"
+    else:
+        want = "not shown; keep Listening as the default and do not ask again"
+    lines = ["<think>", f"Jev signals: {', '.join(sig)}", f"They want: {want if r['emotional'] else '-'}"]
+    if where:  # 앞 답에서 이미 수단 위치를 물었음 → 되묻지 말고 다음 걸음 (2026-10-26: 30B 가 3턴 연속 '지금 어디 있어?')
+        must = [m.replace("ask where the means is right now and help put it away",
+                          "you already asked where the means is; do not ask again, help them put it away or agree on someone to hold it")
+                 .replace("ask what they got and where it is now; help put distance from it",
+                          "you already asked where it is; help put distance from it") for m in must]
+    if asked and not r["risk"]:
+        must.append("you already asked about suicidal thoughts; do not ask it again unless a new risk sign appears")
+    if must:
+        lines.append("Must do this turn: " + "; ".join(dict.fromkeys(must)))
+    lines += ["What they said that shows it:"]
+    text = "\n".join(lines)
+    for k, v in (fill or {}).items():
+        if not k.startswith("_"):
+            text = text.replace("{" + k + "}", v)
+    return text
+
+
+# 2026-10-26: '질문 하나' 칸만 있으니 30B 가 반영 없이 질문만 던졌다 (답 43 → 28단어, 끝 감정 71.7 → 52.9) → 반영 칸을 먼저, 질문은 필요할 때만.
+# 반영 칸을 넣자 떠남·끝을 사랑·안도로 되짚은 답이 2개 나와서 금지 문구를 붙였다
+PLAN_LINES = ("What they said that shows it:", "Any other risk sign I notice:",
+              "How I will reflect their feeling (in their words, specific; never echo dying, leaving or an ending as love, strength or relief):",
+              "The one question I will ask (only if needed, or none):", "What to avoid:")
+# 미리 채운 <think> 를 이어 쓰게 할 때 (자체 생각 모드 없는 챗봇): 남은 칸을 채우고 </think> 뒤에 답
+PLAN_TAIL = ("Your thinking already starts with a short plan whose first lines are decided for you (Jev signals, what they want, "
+             "what you must do this turn). Continue it by filling in, one line each: " + " / ".join(PLAN_LINES)
+             + " Then write </think> on its own line and, after it, only the reply (no labels such as 'Reply:'). The reply opens by "
+             "reflecting their feeling as planned, in a warm and specific way, then does everything under 'Must do this turn'. When "
+             "you reflect, never echo dying, leaving or an ending as love, strength or relief (not \"that's not weakness, that's "
+             "love\" about leaving, not \"an ending feels like the only relief\"); name the pain, not the wish. Ask a "
+             "question only when the plan needs one. Match the length of their message.")
+# 자체 생각 모드 챗봇 (Qwen3-8B): 생각 블록을 미리 채울 수 없어서 계획을 시스템 프롬프트로 주고 생각 첫머리에 옮겨 쓰게 한다
+PLAN_NATIVE = ("In your thinking, start with this plan. Its first lines are decided for you; copy them, then fill in the rest, one "
+               "line each, and make the reply do everything under 'Must do this turn':\n{plan}\n" + "\n".join(PLAN_LINES[1:]))
+
+
+def assemble_route(bank, on, need=None, native=False, offered=False, offer=False):
     """1025)bank.json 라우팅: meta 항상 + 정서 지원 + 보정 + 위험 대응(켜진 축 전부, 순서 없음, 맨 뒤) / 아니면 일반 대화.
     위기 지침은 맨 뒤에 둔다 (2026-10-25: 앞에 두면 8B 가 뒤의 긴 정서 모듈에 묻혀 안전 확인을 안 했다).
-    need: 원하는 방식 (Jev 가 잡았거나 oracle) → 그 전략 하나 + 다시 묻지 말 것 (2026-10-25: 8B 가 정서 턴의 28% 에서 방식을 다시 물었다).
-    모르면 2.0 과 전략 3개, offered (이미 정서 모듈이 한 번 들어갔음) 면 '다시 묻지 말고 들어라' 를 붙인다"""
+    need: 원하는 방식 (Jev 가 잡았거나 oracle) → 그 전략 하나 + 다시 묻지 말 것.
+    offer: 우울이 처음 감지된 턴 → 세 방식을 한 번 권한다 (2026-10-26 사용자: 권한 뒤 사용자 답에서만 방식을 감지).
+    offered: 이미 권했는데 방식이 안 잡힘 → 경청 기본값, 다시 묻지 말 것"""
     r = route(on)
     out = [bank["meta"].replace("{REPLY_FORMAT}", bank["reply_format"]["native" if native else "tags"])]
     if r["emotional"]:
@@ -94,7 +175,7 @@ def assemble_route(bank, on, need=None, native=False, offered=False):
             out.append(bank["strategies"][need]["text"] + "\n\n" + FOLLOW.format(label=bank["strategies"][need]["label"]))
         else:
             out.append("\n\n".join([bank["strategy_intro"]] + [v["text"] for v in bank["strategies"].values()]
-                                     + ([OFFERED] if offered else [])))
+                                     + ([OFFER] if offer else [OFFERED] if offered else [])))
     if r["mods"]:
         out.append("Added factors:\n\n" + "\n\n".join(bank["crisis"][k]["text"] for k in r["mods"]))
     if r["general"]:

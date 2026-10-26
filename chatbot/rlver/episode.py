@@ -14,7 +14,7 @@ import bank as strategy_bank
 from prompts import CHATBOT, REPLY_FORMAT, TAG_FORMAT, TAG_REPLY
 from simulator import SageUser
 
-THINK_TEMPLATES = ("think", "guide", "bank", "bank_oracle", "base", "bank_jev")
+THINK_TEMPLATES = ("think", "guide", "bank", "bank_oracle", "base", "bank_jev", "bank_jev_plan")
 THINK = re.compile(r"\A\s*<think>(.+?)</think>\s*(\S.*)\Z", re.S)
 # 답 첫 줄에 흘린 계획 ("Deep empathy, no risk signs. Avoid: ...", "**Listening / ...**"). 형식 위반이고 보이는 답에서는 지운다
 # 자살·자해를 직접 확인했는지 (보상 감점·평가 공통 키워드)
@@ -35,8 +35,36 @@ def strip_plan(reply):
     return (rest or reply), True
 
 
+# 앞 답에서 자살 생각을 직접 물었는지 (계획 칸에서 '다시 묻지 말 것' 으로 바꾼다). RISK_CHECK 보다 좁게: 상담 전화 이름은 빼고 질문만
+ASKED = re.compile(r"(thinking|thought|thoughts) (about|of) (ending (your|their) life|suicide|killing yourself|taking your (own )?life)|"
+                   r"(do|did) you (mean|want to) (end your life|kill yourself)|(considering|planning) (suicide|ending your life)", re.I)
+WHERE_ASKED = re.compile(r"\bwhere (are|is) (they|it|that|those|the \w+|your \w+)\b|\bwhere (they|it|those|the \w+) (are|is)\b|"
+                         r"\bis it still (there|in|on)\b|\bstill (there|in your)\b.*\?", re.I)
+
+
+def asked_suicide(text):
+    """ASKED 가 맞되 'if you're having thoughts of suicide, call…' 같은 조건문은 빼고 질문만"""
+    return any(not re.search(r"\bif\b[^.?!]*$", text[max(0, m.start() - 60):m.start()], re.I) for m in ASKED.finditer(text))
+
+
+PLAN_LABEL = re.compile(r"^\s*(jev signals|they want|must do this turn|what they said|any other risk|the one question|what to avoid|"
+                        r"reply format|reply|response)\b.*", re.I)
+
+
+def split_plan(raw):
+    """bank_jev_plan 에서 챗봇이 </think> 를 안 닫았을 때 (30B Instruct 가 'Reply format:' 뒤에 바로 답을 쓴다):
+    계획 칸 라벨 줄 중 마지막 것 다음부터를 답으로 본다. 라벨 줄에 붙은 'Reply:' 뒤 글도 답에 넣는다"""
+    lines = raw.replace("<think>", "").split("\n")
+    last = max((i for i, l in enumerate(lines) if PLAN_LABEL.match(l)), default=-1)
+    tail = lines[last][len(re.match(r"^\s*(reply format|reply|response)\s*:", lines[last], re.I).group(0)):] \
+        if last >= 0 and re.match(r"^\s*(reply format|reply|response)\s*:", lines[last], re.I) else ""
+    return "\n".join([tail.strip()] + lines[last + 1:]).strip()
+
+
 def parse_bot(raw, template):
     """→ (사용자에게 보일 답, 형식 맞음). 형식이 틀려도 대화는 이어 간다 (공식 extract_content: 마지막 </think> 뒤)"""
+    if template == "bank_jev_plan" and "</think>" not in raw:
+        return split_plan(raw) or "...", False
     if template not in THINK_TEMPLATES:
         reply = re.sub(r"<think>.*?</think>", "", raw, flags=re.S).strip()
         return reply, "<think>" not in raw
@@ -62,7 +90,7 @@ def system_prompt(profile, template, native=False):
         return strategy_bank.assemble_base(strategy_bank.load(), native)
     if template == "bank_oracle":
         return strategy_bank.assemble(strategy_bank.load(), profile.get("need"), profile.get("event"), native)
-    if template == "bank_jev":  # 턴마다 Jev 로 다시 조합하므로 첫 턴 전 자리표시 (run_episode 가 바꾼다)
+    if template in ("bank_jev", "bank_jev_plan"):  # 턴마다 Jev 로 다시 조합하므로 첫 턴 전 자리표시 (run_episode 가 바꾼다)
         return ""
     text = CHATBOT[template]
     if TAG_REPLY in text:  # think·guide: bank 와 같은 답 형식 (생각 100단어 · 답 40단어, 자체 생각 모델이면 native)
@@ -70,35 +98,82 @@ def system_prompt(profile, template, native=False):
     return text
 
 
-def jev_route(messages, jev, state, native=False):
-    """bank_jev (2026-10-25): 사용자 최근 발화 3개 → Jev 13축 P(예) + 원하는 방식 → 0/1 → 1025)bank.json 모듈 조합.
-    state: 대화 동안 유지 {"need": 잡힌 방식 (바뀌면 갱신), "offered": 정서 모듈이 이미 들어갔는지}"""
-    probs, need = jev.judge(messages)
-    if need:
-        state["need"] = need
+def plan_then_reply(bot, messages, block):
+    """자체 생각 모드 없는 챗봇 (30B Instruct) 의 bank_jev_plan: 두 번 부른다 (2026-10-26).
+    한 번에 이어 쓰게 하면 </think> 를 닫지 않고 'Reply format:' 뒤에 답을 섞어 쓴다.
+    1) 계획 칸만 이어 쓰고 'What to avoid:' 줄까지 자른다  2) 코드가 </think> 를 붙여 답만 쓰게 한다"""
+    plan = bot(messages, prefill=block, stop=["</think>", "\n\n\n"], max_tokens=300)
+    lines, keep = plan.split("\n"), []
+    for l in lines:
+        keep.append(l)
+        if l.lower().startswith("what to avoid:"):
+            break
+    head = "\n".join(keep).rstrip() + "\n</think>\n"
+    for _ in range(3):  # 30B 가 </think> 뒤에 바로 끝내는 일이 있다 (스모크 1/3 대화에서 빈 답)
+        raw = bot(messages, prefill=head)
+        if raw[len(head):].strip():
+            return raw
+    return raw
+
+
+def jev_route(messages, jev, state, native=False, plan=False):
+    """bank_jev (2026-10-25): 사용자 최근 발화 3개 → Jev 13축 P(예) → 0/1 → 1025)bank.json 모듈 조합.
+    원하는 방식 (2026-10-26 사용자): 우울이 처음 켜진 턴에 챗봇이 세 방식을 한 번 권하고, 그 다음 사용자 답에서만 Jev 로 감지한다.
+    거기서 안 잡히면 경청 기본값, 다시 묻지 않는다.
+    state: {"need": 잡힌 방식, "offered": 권했는지, "await": 이번 사용자 발화가 권한 것에 대한 답인지, "risk_seen": 켜진 적 있는 위험 축}
+    plan: bank_jev_plan → (시스템 프롬프트, 미리 채울 <think> 또는 None). 자체 생각 챗봇은 계획을 시스템 프롬프트에 넣는다"""
+    ask = state["await"]
+    probs, need = jev.judge(messages, need=ask)
+    if ask:
+        state["await"] = False
+        state["need"] = need or state["need"]
     on = strategy_bank.fired(probs)
+    # 한 번 켜진 위험 축은 대화 끝까지 켜 둔다 (2026-10-26 사용자): 날짜·계획을 말한 발화가 3개 창 밖으로 밀리면 위험 축이 꺼지고,
+    # 우울 모듈만 남은 턴에서 30B 가 '그건 힘이야', '그냥 평화야' 처럼 떠남·끝을 받아 줬다. 보정 3개는 그대로 턴마다
+    sticky = [k for k in state.setdefault("risk_seen", []) if not on.get(k)]
+    for k in strategy_bank.RISK_AXES:
+        if on.get(k) and k not in state["risk_seen"]:
+            state["risk_seen"].append(k)
+    for k in sticky:
+        on[k] = 1
     route = strategy_bank.route(on)
-    text = strategy_bank.assemble_route(strategy_bank.load(strategy_bank.BANK_1025), on, need=state["need"], native=native,
-                                        offered=state["offered"])
-    state["offered"] = state["offered"] or route["emotional"]
-    return text, probs, {**route, "need": state["need"], "need_now": need}
+    # 정서 지원 (우울) 의 첫 답에서만 방식을 한 번 권한다. 일반 대화 (normal) 는 묻지 않고 자연스럽게 (2026-10-26 사용자)
+    offer = route["emotional"] and not state["offered"] and state["need"] is None
+    bank = strategy_bank.load(strategy_bank.BANK_1025)
+    text = strategy_bank.assemble_route(bank, on, need=state["need"], native=native, offered=state["offered"], offer=offer)
+    if offer:
+        state["offered"] = state["await"] = True
+    prefill = None
+    if plan:
+        prev = [m["content"] for m in messages if m["role"] == "assistant"]
+        asked = any(asked_suicide(t) for t in prev)
+        where = any(WHERE_ASKED.search(t) for t in prev)
+        block = strategy_bank.plan_block(on, need=state["need"], offer=offer, fill=bank.get("fill"), asked=asked, where=where)
+        if native:
+            text += "\n\n" + strategy_bank.PLAN_NATIVE.format(plan=block.replace("<think>\n", ""))
+        else:
+            text += "\n\n" + strategy_bank.PLAN_TAIL
+            prefill = block + " "
+    return text, probs, {**route, "need": state["need"], "need_asked": ask, "need_now": need if ask else None, "offer": offer,
+                         "sticky": sticky}, prefill
 
 
 def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=True, jev=None):
-    """jev: template bank_jev 일 때 jev.Jev (판정기)"""
+    """jev: template bank_jev·bank_jev_plan 일 때 jev.Jev (판정기)"""
     emo, ep = cfg["emotion"], cfg["episode"]
-    assert template != "bank_jev" or jev is not None, "bank_jev 는 jev 판정기가 필요하다"
+    assert template not in ("bank_jev", "bank_jev_plan") or jev is not None, "bank_jev 는 jev 판정기가 필요하다"
     user = SageUser(profile, sim_llm, emo)
     first, first_thinking = user.open(profile.get("first_talk") if use_first_talk else None)
     messages = [{"role": "system", "content": system_prompt(profile, template, getattr(bot, "native_think", False))}, {"role": "user", "content": first}]
     turns, end = [{"user": first, "user_thinking": first_thinking, "emotion": user.emotion}], "max_turns"
     native = getattr(bot, "native_think", False)
-    jev_state = {"need": None, "offered": False}
+    jev_state = {"need": None, "offered": False, "await": False}
     for _ in range(ep["max_turns"]):
-        if template == "bank_jev":
-            messages[0]["content"], probs, route = jev_route(messages, jev, jev_state, native)
+        prefill = None
+        if template in ("bank_jev", "bank_jev_plan"):
+            messages[0]["content"], probs, route, prefill = jev_route(messages, jev, jev_state, native, plan=template == "bank_jev_plan")
             turns[-1].update(jev={k: round(v, 3) for k, v in probs.items()}, route=route)
-        raw = bot(messages)
+        raw = plan_then_reply(bot, messages, prefill) if prefill else bot(messages)
         reply, ok = parse_bot(raw, template)
         if not reply:
             reply, ok = "...", False

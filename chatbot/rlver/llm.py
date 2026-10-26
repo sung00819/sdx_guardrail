@@ -52,9 +52,17 @@ class Chat:
         if key:
             self.session.headers["Authorization"] = f"Bearer {key}"
 
-    def __call__(self, messages, retries=5):
+    def __call__(self, messages, retries=5, prefill=None, stop=None, max_tokens=None):
+        """prefill: 답의 앞부분을 미리 채우고 이어 쓰게 한다 (vLLM continue_final_message). 돌려주는 글에 prefill 을 붙인다.
+        stop·max_tokens: 이 호출만 바꾼다 (bank_jev_plan 의 계획 단계)"""
+        if prefill:
+            messages = messages + [{"role": "assistant", "content": prefill}]
         body = {"model": self.model, "messages": messages, "temperature": self.temperature,
-                "max_tokens": self.max_tokens}
+                "max_tokens": max_tokens or self.max_tokens}
+        if stop:
+            body["stop"] = stop
+        if prefill:
+            body.update(continue_final_message=True, add_generation_prompt=False)
         if self.disable_thinking:  # Qwen3 하이브리드: 모델 자체의 생각 모드는 끈다 (think-then-say 는 프롬프트로)
             body["chat_template_kwargs"] = {"enable_thinking": False}
         with self._lock:
@@ -63,7 +71,7 @@ class Chat:
             try:
                 r = self.session.post(url, json=body, timeout=300)
                 if r.status_code == 200:
-                    return r.json()["choices"][0]["message"]["content"] or ""
+                    return (prefill or "") + (r.json()["choices"][0]["message"]["content"] or "")
                 if r.status_code not in (429, 500, 502, 503, 504):
                     raise RuntimeError(f"HTTP {r.status_code}: {r.text[:300]}")
             except requests.exceptions.RequestException:

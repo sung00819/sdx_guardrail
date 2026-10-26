@@ -1,10 +1,16 @@
 {
-  "_doc": "1025 bank_jev 대화 (84 tmux yumin_jev): 시뮬레이터 30B 84 GPU 0-1·3-4·5-6 (18601·18603·18604), 챗봇 Qwen3-8B 84 GPU 2 (18602) + 54 GPU 0-7 (18621-18628, 84→54 터널). 2026-10-25 밤: 8B 한 대가 KV 캐시 99% 로 막혀서 54 의 30B 4대를 8B 8대로 바꿈 / qwen30b 는 시뮬레이터 30B 를 같이 씀",
+  "_doc": "1025 bank_jev 대화 (84 tmux yumin_jev 에서 실행). 시뮬레이터·qwen30b = 30B: 84 GPU 0-1·3-4·5-6 (18601·18603·18604) + 43 Ada 0-5 (18631-18636). qwen3-8b = 84 GPU 2 (18602) + 27 4090 0-7 (18721-18728) + 43 A100 (18637). 27·43 은 맥 에이전트를 넘긴 84 터널 (키 등록 없이, 맥 연결이 끊기면 빠짐). 54 는 10-26 접속 안 됨",
   "simulator": {
     "base_url": [
       "http://localhost:18601/v1",
       "http://localhost:18603/v1",
-      "http://localhost:18604/v1"
+      "http://localhost:18604/v1",
+      "http://localhost:18631/v1",
+      "http://localhost:18632/v1",
+      "http://localhost:18633/v1",
+      "http://localhost:18634/v1",
+      "http://localhost:18635/v1",
+      "http://localhost:18636/v1"
     ],
     "model": "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
     "temperature": 0.5,
@@ -15,14 +21,15 @@
     "qwen3-8b": {
       "base_url": [
         "http://localhost:18602/v1",
-        "http://localhost:18621/v1",
-        "http://localhost:18622/v1",
-        "http://localhost:18623/v1",
-        "http://localhost:18624/v1",
-        "http://localhost:18625/v1",
-        "http://localhost:18626/v1",
-        "http://localhost:18627/v1",
-        "http://localhost:18628/v1"
+        "http://localhost:18721/v1",
+        "http://localhost:18722/v1",
+        "http://localhost:18723/v1",
+        "http://localhost:18724/v1",
+        "http://localhost:18725/v1",
+        "http://localhost:18726/v1",
+        "http://localhost:18727/v1",
+        "http://localhost:18728/v1",
+        "http://localhost:18637/v1"
       ],
       "model": "Qwen/Qwen3-8B",
       "temperature": 0.7,
@@ -35,7 +42,13 @@
       "base_url": [
         "http://localhost:18601/v1",
         "http://localhost:18603/v1",
-        "http://localhost:18604/v1"
+        "http://localhost:18604/v1",
+        "http://localhost:18631/v1",
+        "http://localhost:18632/v1",
+        "http://localhost:18633/v1",
+        "http://localhost:18634/v1",
+        "http://localhost:18635/v1",
+        "http://localhost:18636/v1"
       ],
       "model": "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
       "temperature": 0.7,

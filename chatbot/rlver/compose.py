@@ -15,8 +15,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from prompts import (BACKGROUND, DISCLOSURE, DISCLOSURE_NORMAL, FIXED_RULES, FIXED_RULES_NORMAL, HIDDEN_NORMAL,  # noqa: E402
-                     NEED_SAY, NEED_SAY_NORMAL, NEEDS, NEEDS_NORMAL, PURPOSE_NORMAL)
+from prompts import (BACKGROUND, DISCLOSURE, DISCLOSURE_NORMAL, FIXED_RULES, FIXED_RULES_NORMAL, HIDDEN_INTENTION_NORMAL,  # noqa: E402
+                     HIDDEN_NORMAL, NEED_SAY, NEED_SAY_NORMAL, NEEDS, PURPOSE_NORMAL)
 from sim_text import EFFORT, STANCE  # noqa: E402
 
 SETTINGS = [(need, disclosure) for disclosure in ("high", "low") for need in NEEDS]  # 6개
@@ -49,16 +49,17 @@ def hidden_text(bg):
 
 
 def build(bg, setting):
-    """배경 + 설정 번호 → 시뮬레이터 프로필. 배경 v2 의 group=normal 은 우울 없는 일상 대화용 지시를 쓴다 (2026-10-25)"""
+    """배경 + 설정 번호 → 시뮬레이터 프로필. 배경 v2 의 group=normal 은 우울 없는 일상 대화용 지시를 쓴다 (2026-10-25).
+    normal 은 원하는 대응 방식이 없다 (2026-10-26): need=None, 설정 번호는 털어놓는 정도만 뜻한다"""
     t = sample_traits(bg, setting)
     if bg.get("group") == "normal":
         background = BACKGROUND.format(topic=bg["topic"], story=bg["background"],
                                        hidden=HIDDEN_NORMAL.format(core_concern=bg["core_concern"]),
                                        disclosure=DISCLOSURE_NORMAL[t["disclosure"]], fixed=FIXED_RULES_NORMAL,
-                                       need=NEEDS_NORMAL[t["need"]], need_say=NEED_SAY_NORMAL[t["need"]])
+                                       need=HIDDEN_INTENTION_NORMAL, need_say=NEED_SAY_NORMAL)
         background = background.replace("## Hidden worry and signals (never state these directly at the start)", "## What you bring to the chat")
         return {"id": bg["id"], "persona": persona_text(bg, t), "background": background, "purpose": PURPOSE_NORMAL,
-                "task": NEEDS_NORMAL[t["need"]], "event": bg["event"], "group": "normal", **t}
+                "task": HIDDEN_INTENTION_NORMAL, "event": bg["event"], "group": "normal", **t, "need": None}
     background = BACKGROUND.format(topic=bg["topic"], story=bg["background"], hidden=hidden_text(bg),
                                    disclosure=DISCLOSURE[bg["event"], t["disclosure"]], fixed=FIXED_RULES,
                                    need=NEEDS[t["need"]], need_say=NEED_SAY[t["need"]])

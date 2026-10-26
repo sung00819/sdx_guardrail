@@ -82,8 +82,8 @@ def main():
     ap.add_argument("--chatbot", default="qwen2.5-7b", help="config chatbots 의 이름")
     ap.add_argument("--model", help="챗봇 model 이름을 바꾼다 (vLLM 런타임 LoRA 어댑터 이름)")
     ap.add_argument("--temperature", type=float)
-    ap.add_argument("--template", choices=["bank", "bank_jev", "bank_oracle", "base", "guide", "think", "nothink", "sage"], default="bank",
-                    help="bank = 전략 뱅크 (STRATEGY.md), bank_jev = 턴마다 Jev 13축으로 1025)bank.json 모듈 조합, base = bank 에서 뱅크만 뺀 것, bank_oracle = 원하는 방식·위험을 알려 준 상한, guide = 짧은 지침, think·nothink = RLVER 원래")
+    ap.add_argument("--template", choices=["bank", "bank_jev", "bank_jev_plan", "bank_oracle", "base", "guide", "think", "nothink", "sage"], default="bank",
+                    help="bank = 전략 뱅크 (STRATEGY.md), bank_jev = 턴마다 Jev 13축으로 1025)bank.json 모듈 조합, bank_jev_plan = 거기에 Jev·뱅크로 채운 계획 칸을 <think> 앞에, base = bank 에서 뱅크만 뺀 것, bank_oracle = 원하는 방식·위험을 알려 준 상한, guide = 짧은 지침, think·nothink = RLVER 원래")
     ap.add_argument("--judge", default="jev", choices=["jev", "kev", "clm"], help="bank_jev 판정기")
     ap.add_argument("--samples", type=int, default=1, help="프로필마다 대화 수 (GRPO 그룹 크기)")
     ap.add_argument("--no_first_talk", action="store_true", help="테스트 프로필의 고정 첫 발화 대신 시뮬레이터가 연다")
@@ -103,7 +103,7 @@ def main():
         bot_cfg["temperature"] = args.temperature
     bot, sim = Chat(bot_cfg), Chat(cfg["simulator"])
     judge = None
-    if args.template == "bank_jev":
+    if args.template in ("bank_jev", "bank_jev_plan"):
         from jev import Jev
         judge = Jev(args.judge, workers=args.workers)
     if args.profiles:

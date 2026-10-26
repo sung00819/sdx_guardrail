@@ -251,21 +251,14 @@ DISCLOSURE_NORMAL = {
     "high": "You talk about your situation and what you want from the chat openly and in some detail.",
     "low": "You keep your messages short and give only a few details at a time; you add more if the NPC asks. You are not hiding anything and you are not upset, just brief.",
 }
-NEEDS_NORMAL = {
-    "deep_empathy": "You hope the other person will really get why this matters to you (your excitement, your reasons), not just give generic replies.",
-    "listen_vent": "You want the other person to listen while you talk it through out loud.",
-    "practical_advice": "You hope to receive practical, specific suggestions for your question or decision.",
-}
-NEED_SAY_NORMAL = {
-    "deep_empathy": "You say you mostly want someone who gets why it matters to you.",
-    "listen_vent": "You say you just want to talk it through.",
-    "practical_advice": NEED_SAY["practical_advice"],
-}
+# 2026-10-26 사용자: normal 은 핵심 걱정에 이미 '~를 정해야 함 / ~가 고민' 이 있으니 원하는 대응 방식을 주지 않고 자연스럽게 대화만 한다
+HIDDEN_INTENTION_NORMAL = ("You simply want to chat about this naturally, the way you would with a friend who is good to talk to; "
+                           "you have no particular way you want them to respond.")
+NEED_SAY_NORMAL = "If they ask how they can help, answer naturally from your situation (what you need to sort out)."
 FIXED_RULES_NORMAL = """Fixed rules:
-Emotion (how engaged and satisfied you are) rises when the NPC responds to what you actually brought up in the way you want (the hidden intention below), with specific, natural replies.
+Emotion (how engaged and satisfied you are) rises when the NPC responds naturally and helpfully to what you actually brought up, with specific replies that fit your situation.
 Emotion falls when the NPC:
 - treats you as if you were sad, stressed or in crisis when you are not (asks again and again how you are really feeling, offers hotlines, assumes a hidden problem)
-- after you said what you want, responds in a different way
 - gives generic or templated replies, asks several questions in one message, or repeats nearly the same reply
 - lectures or ignores the details you gave
 You stay in a neutral or good mood whatever the NPC says; a poor reply makes you less engaged, not sad."""
