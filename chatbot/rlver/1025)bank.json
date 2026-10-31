@@ -62,7 +62,7 @@
     },
     "acute_context": {
       "label": "Acute risk context (added factor)",
-      "text": "Acute risk context (added factor)\nDo:\n- Acknowledge the specific event and how hard it has been (a loss, a breakup, a job loss, debt, violence).\n- Check whether they have thoughts of suicide since that event happened.\n- If they have been drinking heavily or have barely slept, check their safety for tonight and suggest someone to be with.\nDo not:\n- Do not comfort them about the event alone and skip the risk check."
+      "text": "Acute risk context (added factor)\nDo:\n- Acknowledge the specific situation and how hard it has been (a death or serious loss, including losing something they deeply hoped for or long worked toward; a divorce or breakup; losing a job; money they cannot cover or have fallen behind on; bullying or a serious family conflict; a worsening illness or caring for someone who is ill; violence or a legal problem).\n- Check whether they have thoughts of suicide since that event happened.\n- If they have been drinking heavily or have barely slept, check their safety for tonight and suggest someone to be with.\nDo not:\n- Do not comfort them about the event alone and skip the risk check."
     },
     "psych_history": {
       "label": "Psychiatric history (added factor)",

@@ -55,7 +55,7 @@ def summarize(eps):
             "turns": sum(len(e["turns"]) - 1 for e in eps) / n,
             "by_cell": mean_by([{**e, "cell": f"{e.get('event')}·{e.get('disclosure')}"} for e in eps], "cell"),
             "by_need": mean_by(eps, "need"),
-            "by_stance": mean_by(eps, "stance"), "by_task": mean_by(eps, "task")}
+            "by_task": mean_by(eps, "task")}
 
 
 def print_summary(s):
@@ -63,7 +63,7 @@ def print_summary(s):
           f" · 보상 {s['reward']:.3f} · 형식 위반 {s['format_fail']:.0%} · 반복 턴 {s.get('repeat_turns', 0):.0%}"
           f" · 긴 턴 {s.get('long_turns', 0):.0%} · severe 확인 {s.get('severe_checked', 0):.0%}"
           f" · 평균 턴 {s['turns']:.1f}")
-    for t, v in {**s["by_cell"], **s["by_need"], **s["by_stance"]}.items():
+    for t, v in {**s["by_cell"], **s["by_need"]}.items():
         print(f"  {v:5.1f}  {t}")
 
 
@@ -82,7 +82,7 @@ def main():
     ap.add_argument("--chatbot", default="qwen2.5-7b", help="config chatbots 의 이름")
     ap.add_argument("--model", help="챗봇 model 이름을 바꾼다 (vLLM 런타임 LoRA 어댑터 이름)")
     ap.add_argument("--temperature", type=float)
-    ap.add_argument("--template", choices=["bank", "bank_jev", "bank_jev_plan", "bank_oracle", "base", "guide", "think", "nothink", "sage"], default="bank",
+    ap.add_argument("--template", choices=["bank", "bank_jev", "bank_jev_plan", "bank_oracle", "base", "guide", "think", "nothink", "sage", "plain", "plain_len"], default="bank",
                     help="bank = 전략 뱅크 (STRATEGY.md), bank_jev = 턴마다 Jev 13축으로 1025)bank.json 모듈 조합, bank_jev_plan = 거기에 Jev·뱅크로 채운 계획 칸을 <think> 앞에, base = bank 에서 뱅크만 뺀 것, bank_oracle = 원하는 방식·위험을 알려 준 상한, guide = 짧은 지침, think·nothink = RLVER 원래")
     ap.add_argument("--judge", default="jev", choices=["jev", "kev", "clm"], help="bank_jev 판정기")
     ap.add_argument("--samples", type=int, default=1, help="프로필마다 대화 수 (GRPO 그룹 크기)")
@@ -136,7 +136,7 @@ def main():
     def one(job):
         p, s = job
         ep = run_episode(p, bot, sim, cfg, args.template, use_first_talk=not args.no_first_talk, jev=judge)
-        extra = {k: p.get(k) for k in ("setting", "need", "stance", "effort")}  # event·disclosure 는 episode 가 넣는다
+        extra = {k: p.get(k) for k in ("setting", "need", "effort")}  # event·disclosure 는 episode 가 넣는다
         return {**ep, **extra, "sample": s, "chatbot": bot_cfg["model"]}
 
     fails = 0

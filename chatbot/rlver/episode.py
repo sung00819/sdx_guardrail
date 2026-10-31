@@ -42,6 +42,14 @@ WHERE_ASKED = re.compile(r"\bwhere (are|is) (they|it|that|those|the \w+|your \w+
                          r"\bis it still (there|in|on)\b|\bstill (there|in your)\b.*\?", re.I)
 
 
+# 안전 확인 단계를 앞 답에서 이미 했는지 (strategy_bank.SAFETY_STEPS)
+PLAN_ASKED = re.compile(r"\b(a plan|any plans?|planned|planning)\b[^.?!]*\?|\b(when|where) (would|will|are) you (thinking|planning|going)\b|"
+                        r"\b(a|any) (time|date|day|place) in mind\b", re.I)
+MEANS_ASKED = re.compile(r"\b(have|got|keep) (the |any )?(pills|medication|means|knife|blade|cord|rope|chemicals|anything)\b[^.?!]*\?", re.I)
+SAFETY_ASKED = re.compile(r"\bare you safe\b|\bsafe right now\b|\bare you alone\b|\banyone (with you|nearby|who can)\b|"
+                          r"\bsomeone (who can|to) (be|stay|come)\b|\b109\b", re.I)
+
+
 def asked_suicide(text):
     """ASKED 가 맞되 'if you're having thoughts of suicide, call…' 같은 조건문은 빼고 질문만"""
     return any(not re.search(r"\bif\b[^.?!]*$", text[max(0, m.start() - 60):m.start()], re.I) for m in ASKED.finditer(text))
@@ -98,11 +106,19 @@ def system_prompt(profile, template, native=False):
     return text
 
 
-def plan_then_reply(bot, messages, block):
+# 계획 칸 없이 답만 쓰는 턴 (자체 생각 없는 챗봇의 우울·일반 턴): 뱅크 답 형식 'tags' 대신
+REPLY_ONLY = "Write only the reply itself (about as long as their message, at most 60 words): no thinking, labels, notes or plan."
+
+REDO_SIMILARITY = 0.6
+REDO_NOTE = ("Your draft for this turn nearly repeated an earlier reply of yours:\n\"{prev}\"\nWrite a different reply: respond to what "
+             "they just said and take the next step in the plan, without reusing those sentences.")
+
+
+def plan_then_reply(bot, messages, block, temperature=None):
     """자체 생각 모드 없는 챗봇 (30B Instruct) 의 bank_jev_plan: 두 번 부른다 (2026-10-26).
     한 번에 이어 쓰게 하면 </think> 를 닫지 않고 'Reply format:' 뒤에 답을 섞어 쓴다.
     1) 계획 칸만 이어 쓰고 'What to avoid:' 줄까지 자른다  2) 코드가 </think> 를 붙여 답만 쓰게 한다"""
-    plan = bot(messages, prefill=block, stop=["</think>", "\n\n\n"], max_tokens=300)
+    plan = bot(messages, prefill=block, stop=["</think>", "\n\n\n"], max_tokens=300, temperature=temperature)
     lines, keep = plan.split("\n"), []
     for l in lines:
         keep.append(l)
@@ -110,7 +126,7 @@ def plan_then_reply(bot, messages, block):
             break
     head = "\n".join(keep).rstrip() + "\n</think>\n"
     for _ in range(3):  # 30B 가 </think> 뒤에 바로 끝내는 일이 있다 (스모크 1/3 대화에서 빈 답)
-        raw = bot(messages, prefill=head)
+        raw = bot(messages, prefill=head, temperature=temperature)
         if raw[len(head):].strip():
             return raw
     return raw
@@ -131,9 +147,8 @@ def jev_route(messages, jev, state, native=False, plan=False):
     # 한 번 켜진 위험 축은 대화 끝까지 켜 둔다 (2026-10-26 사용자): 날짜·계획을 말한 발화가 3개 창 밖으로 밀리면 위험 축이 꺼지고,
     # 우울 모듈만 남은 턴에서 30B 가 '그건 힘이야', '그냥 평화야' 처럼 떠남·끝을 받아 줬다. 보정 3개는 그대로 턴마다
     sticky = [k for k in state.setdefault("risk_seen", []) if not on.get(k)]
-    for k in strategy_bank.RISK_AXES:
-        if on.get(k) and k not in state["risk_seen"]:
-            state["risk_seen"].append(k)
+    new = [k for k in strategy_bank.RISK_AXES if on.get(k) and k not in state["risk_seen"]]
+    state["risk_seen"] += new
     for k in sticky:
         on[k] = 1
     route = strategy_bank.route(on)
@@ -144,11 +159,18 @@ def jev_route(messages, jev, state, native=False, plan=False):
     if offer:
         state["offered"] = state["await"] = True
     prefill = None
+    # 자체 생각 없는 챗봇 (30B) 은 위험 축이 켜진 턴에만 계획 칸을 쓴다 (2026-10-26 사용자: 계획 칸 약 210토큰 + 두 번 호출이
+    # 지연을 키운다). 우울·일반 턴은 계획 없이 한 번에 답만 쓰게 한다
+    if plan and not native and not route["risk"]:
+        assert bank["reply_format"]["tags"] in text
+        text = text.replace(bank["reply_format"]["tags"], REPLY_ONLY)
+        plan = False
     if plan:
         prev = [m["content"] for m in messages if m["role"] == "assistant"]
-        asked = any(asked_suicide(t) for t in prev)
-        where = any(WHERE_ASKED.search(t) for t in prev)
-        block = strategy_bank.plan_block(on, need=state["need"], offer=offer, fill=bank.get("fill"), asked=asked, where=where)
+        done = {"suicide": any(asked_suicide(t) for t in prev), "plan": any(PLAN_ASKED.search(t) for t in prev),
+                "means": any(WHERE_ASKED.search(t) or MEANS_ASKED.search(t) for t in prev),
+                "safety": any(SAFETY_ASKED.search(t) for t in prev)}
+        block = strategy_bank.plan_block(on, need=state["need"], offer=offer, fill=bank.get("fill"), done=done, new=new)
         if native:
             text += "\n\n" + strategy_bank.PLAN_NATIVE.format(plan=block.replace("<think>\n", ""))
         else:
@@ -174,12 +196,25 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
             messages[0]["content"], probs, route, prefill = jev_route(messages, jev, jev_state, native, plan=template == "bank_jev_plan")
             turns[-1].update(jev={k: round(v, 3) for k, v in probs.items()}, route=route)
         raw = plan_then_reply(bot, messages, prefill) if prefill else bot(messages)
-        reply, ok = parse_bot(raw, template)
+        fmt = "reply_only" if template == "bank_jev_plan" and not native and not prefill else template  # 계획 칸 없이 답만 쓴 턴
+        reply, ok = parse_bot(raw, fmt)
+        redo = 0
+        if template == "bank_jev_plan":  # 2026-10-26: 30B 가 같은 답을 턴마다 복사했다 → 앞 답과 거의 같으면 다시 쓰게 한다 (최대 2번)
+            prev_bots = [t["bot"] for t in turns if "bot" in t]
+            while redo < 2 and max_similarity(reply, prev_bots) >= REDO_SIMILARITY:
+                redo += 1
+                note = REDO_NOTE.format(prev=max(prev_bots, key=lambda p: max_similarity(reply, [p])))
+                retry = [{**messages[0], "content": messages[0]["content"] + "\n\n" + note}] + messages[1:]
+                # 같은 계획 칸으로 다시 부르면 30B 가 같은 답을 또 쓴다 → 계획 첫머리에 '새로 말해야 함' 을 박고 온도를 올린다
+                head = (prefill.replace("<think>\n", "<think>\nMy last draft repeated an earlier reply word for word; this time I "
+                                        "respond to their newest message with new words.\n", 1) if prefill else None)
+                raw = plan_then_reply(bot, retry, head, temperature=1.0) if prefill else bot(retry, temperature=1.0)
+                reply, ok = parse_bot(raw, fmt)
         if not reply:
             reply, ok = "...", False
         step = user.step(reply)
         # 학습 샘플: 이 턴의 입력(messages) + 원문 답(raw, 생각 블록 포함). 지난 턴의 생각 블록은 입력에 남기지 않는다 (공식 코드)
-        turns[-1].update(prompt=[dict(m) for m in messages], bot_raw=raw, bot=reply, format_ok=ok)
+        turns[-1].update(prompt=[dict(m) for m in messages], bot_raw=raw, bot=reply, format_ok=ok, redo=redo)
         turns.append({"user": step["user"], "user_thinking": step["user_thinking"], "change": step["change"],
                       "emotion": step["emotion"], "state": step["state"], "planning": step["planning"]})
         messages += [{"role": "assistant", "content": reply}, {"role": "user", "content": step["user"]}]

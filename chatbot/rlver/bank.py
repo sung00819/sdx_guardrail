@@ -89,36 +89,70 @@ SIGNAL = {"obtain_means": "got or looked for means", "suicide_note": "wrote a su
           "repeated_self_harm": "repeated self-harm", "cannot_stay_safe": "cannot keep themselves safe", "means_access": "lethal means at hand",
           "method": "thinking about a method", "depression": "low mood", "acute_context": "a major recent stressor",
           "psych_history": "psychiatric history", "substance_use_disorder": "substance use problem"}
-MUST = {"obtain_means": "ask what they got and where it is now; help put distance from it",
-        "suicide_note": "say gently you take the note seriously; ask about a plan or a time",
-        "put_affairs_in_order": "ask directly whether they are getting ready to end their life",
-        "specific_plan": "ask whether they are alone; connect them with {CRISIS_LINE} now",
-        "nonsuicidal_self_harm": "ask whether they are hurt now; check separately for suicidal thoughts",
-        "repeated_self_harm": "ask whether they are hurt now and whether it has got worse lately; check for suicidal thoughts",
+# 축마다 이번 턴에 할 일 (자살 생각·계획·수단·안전 확인은 아래 단계 SAFETY_STEPS 가 맡는다, 2026-10-26: 축 줄에도 자살 질문이 들어 있어
+# '이미 물었음' 과 '물어라' 가 한 줄에 같이 나오고, 30B 가 '응' 이라고 답한 뒤에도 같은 질문을 되풀이했다)
+MUST = {"obtain_means": "help put distance between them and what they got",
+        "suicide_note": "say gently you take the note seriously; do not comment on its content",
+        "put_affairs_in_order": "say gently that it sounds a bit like getting ready to leave (that is why you ask)",
+        "specific_plan": "treat it as close danger; connect them with {CRISIS_LINE} now",
+        "nonsuicidal_self_harm": "ask whether they are hurt now and need care",
+        "repeated_self_harm": "ask whether they are hurt now and whether it has got worse lately",
         "cannot_stay_safe": "ask where they are and who can be with them; connect them with {CRISIS_LINE} now",
-        "means_access": "ask where the means is right now and help put it away",
-        "method": "ask directly about suicidal thoughts and any intent or plan",
-        "acute_context": "acknowledge the event; check for suicidal thoughts since it happened",
+        "means_access": "help them put the means away or hand it to someone",
+        "method": "do not comment on whether the method would work",
+        "acute_context": "acknowledge the event",
         "substance_use_disorder": "check whether they have been drinking or using right now",
         "psych_history": "ask what has helped before; suggest their doctor or therapist"}
+MEANS_AXES = {"obtain_means", "means_access", "method", "specific_plan"}
+KEEP_MUST = {"obtain_means", "means_access", "cannot_stay_safe"}  # 수단·안전은 켜져 있는 동안 계속, 나머지 축 줄은 처음 켜진 턴에만
+# 위험이 켜진 동안의 안전 확인 단계. 앞 답에서 이미 한 단계는 건너뛰고, 이번 턴에는 다음 한 단계만 한다
+SAFETY_STEPS = [
+    ("suicide", "ask directly whether they are thinking about ending their life"),
+    ("plan", "they already answered whether they think about ending their life; do not ask it again. Now ask whether they have a plan or a time in mind"),
+    ("means", "do not ask again about suicide or a plan. Ask whether the means is nearby and where it is right now"),
+    ("safety", "do not repeat earlier questions. Check whether they are safe right now and whether someone can be with them; offer {CRISIS_LINE}"),
+]
+STEPS_DONE = ("the safety questions are done; do not repeat them. Stay with them, help them agree on one person to contact today "
+              "and check whether they reached out")
+
+
+MEANS_FIRST = {"means_access", "obtain_means"}
+MEANS_FIRST_STEP = "ask where the means is right now (before anything else), then help them put it away"
+
+
+def safety_step(done, means, means_first=False):
+    """done: {"suicide","plan","means","safety": 앞 답에서 이미 했는지} → 이번 턴에 할 한 단계.
+    means_first: 수단 접근·방법 마련이 켜짐 → 수단 위치를 맨 먼저 (2026-10-26: 자살 → 계획 → 수단 순서로 두자
+    수단을 2턴 안에 묻는 비율이 84 → 43% 로 떨어졌다. 뱅크 3.8 은 '수단을 말한 바로 다음 답에서')"""
+    if means_first and not done.get("means"):
+        return MEANS_FIRST_STEP
+    for key, text in SAFETY_STEPS:
+        if key == "means" and not means:
+            continue
+        if not done.get(key):
+            return text
+    return STEPS_DONE
+
+
 WANT = {"listen_vent": "Listening (let them get it out)", "deep_empathy": "Deep empathy (show you really get what it is like for them)",
         "practical_advice": "Advice (one or two concrete options)"}
 
 
-def plan_block(on, need=None, offer=False, fill=None, asked=False, where=False):
+def plan_block(on, need=None, offer=False, fill=None, done=None, new=None):
     """<think> 앞부분. 코드가 채우는 줄 (Jev signals · They want · Must do) + 모델이 채울 빈 줄.
-    asked: 앞 답에서 이미 자살 생각을 직접 물었음 → 다시 묻지 말고 답을 따라가라 (2026-10-26: 30B 가 매 턴 되물었다)"""
+    done: 앞 답에서 이미 한 안전 확인 {"suicide","plan","means","safety"} → 위험이 켜진 동안 다음 한 단계만 (SAFETY_STEPS)"""
+    done = done or {}
     r = route(on)
     if r["general"]:  # 일반 대화 (normal 등): 방식은 묻지 않고 자연스럽게 (2026-10-26 사용자)
         return "<think>\nWhat they want to talk about:\nHow I will respond to it (specific to their details):"
     sig = [SIGNAL[k] for k in r["risk"] + (["depression"] if r["emotional"] else []) + r["mods"]]
-    ask = ("you already asked directly about suicidal thoughts; do not ask it again, follow up on their answer and the other steps"
-           if asked else "ask directly whether they are thinking about ending their life")
-    must = [MUST[k] for k in r["risk"]] + ([ask] if r["risk"] else []) + [MUST[k] for k in r["mods"]]
-    if asked:
-        must = [m.replace("ask directly about suicidal thoughts and any intent or plan", "ask about any intent or plan")
-                 .replace("; check separately for suicidal thoughts", "").replace("; check for suicidal thoughts", "")
-                 .replace("; check for suicidal thoughts since it happened", "") for m in must]
+    new = set(r["risk"] if new is None else new)  # 이번 턴에 처음 켜진 위험 축
+    must = [MUST[k] for k in r["risk"] if k in new or k in KEEP_MUST]
+    if r["risk"]:
+        must.append(safety_step(done, bool(MEANS_AXES & set(r["risk"])), bool(MEANS_FIRST & set(r["risk"]))))
+    elif done.get("suicide"):
+        must.append("you already asked about suicidal thoughts; do not ask it again unless a new risk sign appears")
+    must += [MUST[k] for k in r["mods"]]
     if offer:
         want = "not known yet; this turn, offer the three ways once (listen / understand / think what to do)"
     elif need:
@@ -126,13 +160,6 @@ def plan_block(on, need=None, offer=False, fill=None, asked=False, where=False):
     else:
         want = "not shown; keep Listening as the default and do not ask again"
     lines = ["<think>", f"Jev signals: {', '.join(sig)}", f"They want: {want if r['emotional'] else '-'}"]
-    if where:  # 앞 답에서 이미 수단 위치를 물었음 → 되묻지 말고 다음 걸음 (2026-10-26: 30B 가 3턴 연속 '지금 어디 있어?')
-        must = [m.replace("ask where the means is right now and help put it away",
-                          "you already asked where the means is; do not ask again, help them put it away or agree on someone to hold it")
-                 .replace("ask what they got and where it is now; help put distance from it",
-                          "you already asked where it is; help put distance from it") for m in must]
-    if asked and not r["risk"]:
-        must.append("you already asked about suicidal thoughts; do not ask it again unless a new risk sign appears")
     if must:
         lines.append("Must do this turn: " + "; ".join(dict.fromkeys(must)))
     lines += ["What they said that shows it:"]

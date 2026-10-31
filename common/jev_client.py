@@ -17,9 +17,10 @@ MODEL = "typesafe/jev-1.13"  # 재현성을 위해 버전 고정
 # 판정기 이름 → (주소, model). Kev·CLM 은 TypeSafe /v1/systemone 과 같은 형식
 JUDGE_MODELS = {
     "jev": (ENDPOINT, MODEL),
-    # Kev = 2026-10-11 확정 판정기: Kev-4B 에 개발용 Jev 답을 학습한 어댑터 (54 ~/yumin_sim/judges/kev/runs/sdx_t11e_4b_v2,
-    # 맥 사본 out/judges/models/sdx_t11e_4b_v2, 학습 데이터 kev_train_data.py --select --preset v2). 54 kev_serve.sh 로 띄운다.
-    "kev": (os.environ.get("KEV_URL", "http://127.0.0.1:18631/v1/systemone"), "kev-latest"),
+    # Kev = 2026-10-30 확정 판정기: kev-4b 에서 Jev 15축 (`1029)jev.md`) 답을 LoRA 로 학습 (43 ~/yumin/judges/kev/runs/sdx_jev15_4b_v1,
+    # 학습 데이터 kev13_data.py → out/rlver/kev15_train, 평가 1030)kev15_eval_* · 1030)kev15_bank_eval_*). 43 GPU 4·5·6 에 kev_serve.sh (맥 터널).
+    # 이전 판 ft2 (sdx_t11e_4b_v2, 13축) 는 43 GPU 0·1 18631·18632 → KEV_URL 로 고른다.
+    "kev": (os.environ.get("KEV_URL", ",".join(f"http://127.0.0.1:{p}/v1/systemone" for p in (18644, 18645, 18646))), "kev-latest"),
     "clm": (os.environ.get("CLM_URL", "http://127.0.0.1:18633/v1/systemone"), "clm-latest"),  # CLM-8B
 }
 

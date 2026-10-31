@@ -52,12 +52,12 @@ class Chat:
         if key:
             self.session.headers["Authorization"] = f"Bearer {key}"
 
-    def __call__(self, messages, retries=5, prefill=None, stop=None, max_tokens=None):
+    def __call__(self, messages, retries=5, prefill=None, stop=None, max_tokens=None, temperature=None):
         """prefill: 답의 앞부분을 미리 채우고 이어 쓰게 한다 (vLLM continue_final_message). 돌려주는 글에 prefill 을 붙인다.
         stop·max_tokens: 이 호출만 바꾼다 (bank_jev_plan 의 계획 단계)"""
         if prefill:
             messages = messages + [{"role": "assistant", "content": prefill}]
-        body = {"model": self.model, "messages": messages, "temperature": self.temperature,
+        body = {"model": self.model, "messages": messages, "temperature": self.temperature if temperature is None else temperature,
                 "max_tokens": max_tokens or self.max_tokens}
         if stop:
             body["stop"] = stop

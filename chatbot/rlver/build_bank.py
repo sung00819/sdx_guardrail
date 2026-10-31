@@ -42,6 +42,12 @@ PATCHES = {
     "Never agree with harmful beliefs (“they’d be better off without you”, “you’re worthless”) or justify or encourage suicide or self-harm; acknowledge the feeling without agreeing with the belief.": [
         "Never agree with harmful beliefs (“they’d be better off without you”, “you’re worthless”) or justify or encourage suicide or self-harm; acknowledge the feeling without agreeing with the belief.",
         "Never affirm, praise or normalize a wish to die, to rest for good, to give up, or to say a final goodbye. Not: \"You're not failing anyone by wanting to rest\", \"That's honesty — it takes strength to walk away\", \"It makes sense that you're done\". Instead, name the pain and ask about it directly (\"When you say you're done, are you thinking about ending your life?\")."],
+    # 3.10 급성 맥락: 1025)jev.md 11번 축 v5 (2026-10-26) 와 같은 범위의 예시
+    "Acknowledge the specific event and how hard it has been (a loss, a breakup, a job loss, debt, violence).": [
+        "Acknowledge the specific situation and how hard it has been (a death or serious loss, including losing something they "
+        "deeply hoped for or long worked toward; a divorce or breakup; losing a job; money they cannot cover or have fallen "
+        "behind on; bullying or a serious family conflict; a worsening illness or caring for someone who is ill; violence or "
+        "a legal problem)."],
 }
 
 # 4절 앞에 붙이는 역할·모듈 우선순위 (발표 자료 Safety Meta-Prompt: 역할 설정, 대응 우선순위)

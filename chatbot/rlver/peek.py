@@ -22,7 +22,7 @@ def think_of(raw):
 def render(e, show_think=True):
     head = (f"## {e['id']} · {EVENT_KO.get(e.get('event'), e.get('event'))} · {DISC_KO.get(e.get('disclosure'), e.get('disclosure'))}"
             f" · 원하는 방식: {NEED_KO.get(e.get('need'), e.get('need'))}\n"
-            f"태도 {e.get('stance')} · 대화 노력 {e.get('effort')} · 끝 **{e['end']}** · 마지막 감정 **{e['final_emotion']}** · 보상 {e['reward']:.2f}"
+            f"대화 노력 {e.get('effort')} · 끝 **{e['end']}** · 마지막 감정 **{e['final_emotion']}** · 보상 {e['reward']:.2f}"
             + ("" if e.get("format_ok", True) else " · ⚠ 형식 위반") + "\n")
     out = [head]
     for t in e["turns"]:

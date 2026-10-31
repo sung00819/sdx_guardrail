@@ -19,23 +19,24 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "common"))
 from jev_client import call_jev, flatten, make_session  # noqa: E402
 
-SPEC = os.path.join(HERE, "1025)jev.md")
+# 질문 정본. JEV_SPEC=1029)jev.md 면 15축 (13축 + 자살 사고 · 실행 의도, 10-29)
+SPEC = os.path.join(HERE, os.environ.get("JEV_SPEC", "1025)jev.md"))
 WINDOW = 3  # 판정 단위: 사용자 최근 발화 수 (10-25 사용자 결정)
 SELF_AXES = {"obtain_means", "suicide_note", "put_affairs_in_order", "specific_plan", "cannot_stay_safe",
-             "means_access", "method"}  # [1–4, 7–9번 뒤] 자살 관련 공통 지시
+             "means_access", "method", "suicidal_ideation", "suicidal_intent"}  # [1–4, 7–9, 14–15번 뒤] 자살 관련 공통 지시
 
 
 def _common(md, tag):
-    """**[tag]** 다음 첫 인용 줄 (영어)"""
-    m = re.search(re.escape(f"**[{tag}]**") + r"\s*\n> (.+)", md)
-    assert m, f"1025)jev.md 에 공통 지시 [{tag}] 가 없음"
+    """**[tag]** 다음 첫 인용 줄 (영어). tag 는 정규식"""
+    m = re.search(r"\*\*\[" + tag + r"\]\*\*\s*\n> (.+)", md)
+    assert m, f"{os.path.basename(SPEC)} 에 공통 지시 [{tag}] 가 없음"
     return m.group(1).strip()
 
 
 def load_questions(path=SPEC):
     md = open(path).read()
     pre, post = _common(md, "모든 질문 앞"), _common(md, "모든 질문 뒤")
-    self_note = _common(md, "1–4, 7–9번 뒤: 자살 관련 질문")
+    self_note = _common(md, r"1–4, 7–9[^\]]*번 뒤: 자살 관련 질문")
     qs = {}
     for m in re.finditer(r"^## \d+\. (\w+) — .+?$(.+?)(?=^## |\Z)", md, re.M | re.S):
         key, body = m.group(1), m.group(2)
@@ -63,7 +64,7 @@ def load_need(path=SPEC):
 
 QUESTIONS = load_questions()
 AXES = list(QUESTIONS)
-assert len(AXES) == 13, AXES
+assert len(AXES) in (13, 15), AXES
 NEED_QUESTION = load_need()
 
 
