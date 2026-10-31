@@ -160,10 +160,12 @@ def jev_route(messages, jev, state, native=False, plan=False):
         state["offered"] = state["await"] = True
     prefill = None
     # 자체 생각 없는 챗봇 (30B) 은 위험 축이 켜진 턴에만 계획 칸을 쓴다 (2026-10-26 사용자: 계획 칸 약 210토큰 + 두 번 호출이
-    # 지연을 키운다). 우울·일반 턴은 계획 없이 한 번에 답만 쓰게 한다
-    if plan and not native and not route["risk"]:
-        assert bank["reply_format"]["tags"] in text
-        text = text.replace(bank["reply_format"]["tags"], REPLY_ONLY)
+    # 지연을 키운다). 우울·일반 턴은 계획 없이 한 번에 답만 쓰게 한다. 2026-10-31: 자체 생각 챗봇 (8B) 도 같게
+    # (전에는 8B 는 모든 턴에 계획 칸이 붙었다)
+    if plan and not route["risk"]:
+        if not native:
+            assert bank["reply_format"]["tags"] in text
+            text = text.replace(bank["reply_format"]["tags"], REPLY_ONLY)
         plan = False
     if plan:
         prev = [m["content"] for m in messages if m["role"] == "assistant"]
