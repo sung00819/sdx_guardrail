@@ -1,0 +1,33 @@
+{
+ "config": "chatbot/rlver/1030)config_55.json",
+ "split": "test",
+ "backgrounds": "data/rlver/backgrounds_v2.csv",
+ "settings": "0,1,2,3,4,5",
+ "profiles": null,
+ "ids": null,
+ "pairs": null,
+ "n": 0,
+ "per_event": 0,
+ "chatbot": "qwen3-8b",
+ "model": null,
+ "temperature": null,
+ "template": "bank_jev_plan",
+ "judge": "jev",
+ "samples": 1,
+ "no_first_talk": false,
+ "workers": 128,
+ "out": "/convei_nas2/minseok/yumin/out/1025)bank_jev_plan_test_8b_riskplan2",
+ "summary": null,
+ "chatbot_cfg": {
+  "base_url": [
+   "http://localhost:18781/v1",
+   "http://localhost:18782/v1"
+  ],
+  "model": "Qwen/Qwen3-8B",
+  "temperature": 0.7,
+  "max_tokens": 1500,
+  "disable_thinking": false,
+  "native_think": true,
+  "_doc": "\uc790\uccb4 \uc0dd\uac01 \ubaa8\ub4dc\ub97c \ucf1c\uace0 \uadf8 \uc0dd\uac01 \ube14\ub85d\uc744 think \uce78\uc73c\ub85c (native_think: bank \ub2f5 \ud615\uc2dd\uc774 reply_format.native). \ub044\uba74 <think> \ub97c \uc544\uc608 \uc548 \uc4f0\uace0, \ucf20 \ucc44 \ud615\uc2dd\uc744 \ub610 \uc2dc\ud0a4\uba74 </think> \ub97c \uacb9\uccd0 \uc4f4\ub2e4 (2026-10-19)"
+ }
+}
