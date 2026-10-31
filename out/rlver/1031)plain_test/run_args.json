@@ -1,0 +1,33 @@
+{
+ "config": "chatbot/rlver/1031)config_27_plain.json",
+ "split": "test",
+ "backgrounds": "/Users/seong-yumin/SDX/sdx_rlver_wt/data/rlver/backgrounds_v2.csv",
+ "settings": "0,1,2,3,4,5",
+ "profiles": null,
+ "ids": null,
+ "pairs": null,
+ "n": 0,
+ "per_event": 0,
+ "chatbot": "qwen3-8b-plain",
+ "model": null,
+ "temperature": null,
+ "template": "plain",
+ "judge": "jev",
+ "samples": 1,
+ "no_first_talk": false,
+ "workers": 360,
+ "out": "/Users/seong-yumin/SDX/sdx_rlver_wt/out/rlver/1031)plain_test",
+ "summary": null,
+ "chatbot_cfg": {
+  "base_url": [
+   "http://localhost:18727/v1",
+   "http://localhost:18728/v1"
+  ],
+  "model": "Qwen/Qwen3-8B",
+  "temperature": 0.7,
+  "max_tokens": 1500,
+  "disable_thinking": true,
+  "native_think": false,
+  "_doc": "Qwen3 \uc790\uccb4 \uc0dd\uac01 \ubaa8\ub4dc \ub054 (chat_template enable_thinking=False)"
+ }
+}

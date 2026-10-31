@@ -1,0 +1,37 @@
+{
+ "episodes": 360,
+ "score": 55.75277777777778,
+ "success": 0.0,
+ "failure": 0.06111111111111111,
+ "reward": 0.33986111111111117,
+ "format_fail": 0.0,
+ "repeat_turns": 0.09996492458786391,
+ "long_turns": 0.38302350052613116,
+ "severe_checked": 0.7361111111111112,
+ "turns": 7.919444444444444,
+ "by_cell": {
+  "mild·high": 70.9,
+  "mild·low": 67.8,
+  "severe·high": 54.2,
+  "severe·low": 39.2
+ },
+ "by_need": {
+  "None": 78.0,
+  "deep_empathy": 47.4,
+  "listen_vent": 55.9,
+  "practical_advice": 47.2
+ },
+ "by_stance": {
+  "ambivalent": 55.5,
+  "anxious_clinging": 60.4,
+  "avoidant_minimizing": 54.6,
+  "cooperative": 55.2,
+  "hostile_testing": 52.7
+ },
+ "by_task": {
+  "You hope the other person will deeply empathize with your feelings, rather than simply offering comfort.": 47.4,
+  "You hope to receive practical advice that can genuinely help you with your current difficulties.": 47.2,
+  "You simply want to chat about this naturally, the way you would with a friend who is good to talk to; you have no particular way you want them to respond.": 78.0,
+  "You want the other person to attentively listen to your emotional outpouring.": 55.9
+ }
+}
