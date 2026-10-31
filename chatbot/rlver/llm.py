@@ -36,7 +36,8 @@ def api_key(name):
 
 
 class Chat:
-    """cfg: base_url(하나 또는 복제본 목록), model, temperature, max_tokens, api_key_env, disable_thinking"""
+    """cfg: base_url(하나 또는 복제본 목록), model, temperature, max_tokens, api_key_env, disable_thinking,
+    extra_body (요청에 그대로 더할 필드, 예: OpenRouter provider·reasoning)"""
 
     def __init__(self, cfg):
         urls = cfg["base_url"] if isinstance(cfg["base_url"], list) else [cfg["base_url"]]
@@ -46,7 +47,8 @@ class Chat:
         self.temperature = cfg.get("temperature", 0.7)
         self.max_tokens = cfg.get("max_tokens", 1024)
         self.disable_thinking = cfg.get("disable_thinking", False)
-        self.native_think = cfg.get("native_think", False)  # 자체 생각 블록을 think 칸으로 쓴다 (bank 답 형식이 바뀐다)
+        self.native_think = cfg.get("native_think", False)
+        self.extra_body = cfg.get("extra_body") or {}  # 자체 생각 블록을 think 칸으로 쓴다 (bank 답 형식이 바뀐다)
         self.session = requests.Session()
         key = api_key(cfg.get("api_key_env"))
         if key:
@@ -59,6 +61,7 @@ class Chat:
             messages = messages + [{"role": "assistant", "content": prefill}]
         body = {"model": self.model, "messages": messages, "temperature": self.temperature if temperature is None else temperature,
                 "max_tokens": max_tokens or self.max_tokens}
+        body.update(self.extra_body)
         if stop:
             body["stop"] = stop
         if prefill:

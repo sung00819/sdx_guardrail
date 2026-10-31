@@ -156,14 +156,21 @@ def main():
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--limit", type=int, help="앞 턴 몇 개만 (시험)")
     ap.add_argument("--cache", action="store_true", help="질문을 앞에 둔 프롬프트 (캐시용, PROMPT_CACHE)")
+    ap.add_argument("--provider", help="OpenRouter 업체 고정 (2026-11-01 DeepSeek V4 Pro: 기본 배정은 캐시가 안 걸려 StreamLake 로 고정)")
+    ap.add_argument("--no-reasoning", action="store_true", help="모델의 생각 끔 (DeepSeek V4 Pro 는 켜 두면 턴마다 1–3천 토큰)")
     args = ap.parse_args()
     if not args.report:
         path = f"{args.folder}/turn_judge{suffix(args.model)}.jsonl"
         done = {(j["id"], j["setting"], j["turn"]) for j in map(json.loads, open(path))} if os.path.exists(path) else set()
         jobs = [((e["id"], e["setting"]), i, s) for e in map(json.loads, open(f"{args.folder}/episodes.jsonl"))
                 for i, s in turn_states(e) if (e["id"], e["setting"], i) not in done][:args.limit]
+        extra = {}
+        if args.provider:
+            extra["provider"] = {"order": [args.provider], "allow_fallbacks": False}
+        if args.no_reasoning:
+            extra["reasoning"] = {"enabled": False}
         llm = Chat({"base_url": "https://openrouter.ai/api/v1", "model": args.model, "temperature": 0,
-                    "max_tokens": 4000, "api_key_env": "OPENROUTER_API_KEY"})
+                    "max_tokens": 4000, "api_key_env": "OPENROUTER_API_KEY", "extra_body": extra})
         qtext = questions_text()
         print("판정할 턴", len(jobs))
         with ThreadPoolExecutor(args.workers) as ex, open(path, "a") as f:
@@ -176,7 +183,7 @@ def main():
             for n, j in enumerate(ex.map(safe, jobs), 1):
                 if j is None:
                     continue
-                f.write(json.dumps({**j, "model": args.model, "prompt": "cache" if args.cache else "base"}, ensure_ascii=False) + "\n")
+                f.write(json.dumps({**j, "model": args.model, "prompt": "cache" if args.cache else "base", **extra}, ensure_ascii=False) + "\n")
                 f.flush()
                 if n % 500 == 0:
                     print(f"  {n}/{len(jobs)}", flush=True)
