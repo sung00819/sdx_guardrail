@@ -6,6 +6,7 @@
 
     python chatbot/rlver/turn_gold.py "out/rlver/1025)bank_jev_plan_test_30b_riskplan"     # → 폴더/turn_gold.jsonl
     python chatbot/rlver/turn_gold.py <폴더> --report                                        # 비교표만 다시
+    python chatbot/rlver/turn_gold.py <폴더1> <폴더2> ... --report --out <파일>               # 여러 실행 합친 표
 """
 
 import argparse
@@ -70,9 +71,12 @@ def label(e, llm):
     raise ValueError(f"{e['id']} {e['setting']}: 라벨 실패")
 
 
-def report(folder):
-    E = {(e["id"], e["setting"]): e for e in map(json.loads, open(f"{folder}/episodes.jsonl"))}
-    G = {(g["id"], g["setting"]): g["labels"] for g in map(json.loads, open(f"{folder}/turn_gold.jsonl"))}
+def report(folders, path=None):
+    """folders 여러 개면 턴을 모두 합쳐 센다"""
+    E, G = {}, {}
+    for folder in folders:
+        E.update({(folder, e["id"], e["setting"]): e for e in map(json.loads, open(f"{folder}/episodes.jsonl"))})
+        G.update({(folder, g["id"], g["setting"]): g["labels"] for g in map(json.loads, open(f"{folder}/turn_gold.jsonl"))})
     grp = lambda e: "risk" if e["event"] == "severe" else ("depression" if e.get("need") else "normal")
     rows = []  # (그룹, 정답 창, 정답 누적, Jev 창, 라우팅 켜짐)
     for key, e in E.items():
@@ -86,7 +90,7 @@ def report(folder):
             route = set(t.get("route", {}).get("risk", [])) | set(t.get("route", {}).get("mods", [])) | (
                 {"depression"} if t.get("route", {}).get("emotional") else set())
             rows.append((grp(e), win, cum, jv, route))
-    out = [f"# Jev 턴 단위 채점 ({os.path.basename(folder)}, 2026-10-31)\n",
+    out = [f"# Jev 턴 단위 채점 ({', '.join(os.path.basename(f) for f in folders)}, 2026-10-31)\n",
            f"사용자 턴 {len(rows)}개. 정답 = GPT-6 Luna 가 사용자 메시지마다 붙인 축 (정의는 Jev 질문 정본 그대로, turn_gold.jsonl).",
            f"**창 정답** = Jev 와 같은 창 (그 턴까지 최근 사용자 메시지 {WINDOW}개) 에서 말한 축 → Jev P ≥ {TH} 와 비교.",
            "**누적 정답** = 그 턴까지 한 번이라도 말한 축 → 라우팅 (위험 축 유지 포함) 과 비교.\n"]
@@ -109,7 +113,7 @@ def report(folder):
 
     table(lambda k: k, "축 그대로")
     table(lambda k: MERGE.get(k, k), "자살 계획 · 자해 합침 (하나라도 켜지면 켜짐)")
-    path = f"{folder}/turn_gold_report.md"
+    path = path or f"{folders[0]}/turn_gold_report.md"
     open(path, "w").write("\n".join(out) + "\n")
     print("\n".join(out))
     print("→", path)
@@ -117,23 +121,28 @@ def report(folder):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("folder")
+    ap.add_argument("folder", nargs="+", help="여러 개면 --report 로 합친 표 (--out 필요)")
+    ap.add_argument("--out", help="합친 표를 쓸 파일")
     ap.add_argument("--model", default="openai/gpt-6-luna")
     ap.add_argument("--workers", type=int, default=32)
     ap.add_argument("--report", action="store_true", help="라벨은 있는 것으로 비교표만")
     args = ap.parse_args()
+    if args.report:
+        report(args.folder, args.out)
+        return
+    assert len(args.folder) == 1, "라벨은 폴더 하나씩"
+    args.folder = args.folder[0]
     path = f"{args.folder}/turn_gold.jsonl"
-    if not args.report:
-        done = {(g["id"], g["setting"]) for g in map(json.loads, open(path))} if os.path.exists(path) else set()
-        todo = [e for e in map(json.loads, open(f"{args.folder}/episodes.jsonl")) if (e["id"], e["setting"]) not in done]
-        llm = Chat({"base_url": "https://openrouter.ai/api/v1", "model": args.model, "temperature": 0,
-                    "max_tokens": 6000, "api_key_env": "OPENROUTER_API_KEY"})
-        print("라벨할 대화", len(todo))
-        with ThreadPoolExecutor(args.workers) as ex, open(path, "a") as f:
-            for g in ex.map(lambda e: label(e, llm), todo):
-                f.write(json.dumps({**g, "model": args.model}, ensure_ascii=False) + "\n")
-                f.flush()
-    report(args.folder)
+    done = {(g["id"], g["setting"]) for g in map(json.loads, open(path))} if os.path.exists(path) else set()
+    todo = [e for e in map(json.loads, open(f"{args.folder}/episodes.jsonl")) if (e["id"], e["setting"]) not in done]
+    llm = Chat({"base_url": "https://openrouter.ai/api/v1", "model": args.model, "temperature": 0,
+                "max_tokens": 6000, "api_key_env": "OPENROUTER_API_KEY"})
+    print("라벨할 대화", len(todo))
+    with ThreadPoolExecutor(args.workers) as ex, open(path, "a") as f:
+        for g in ex.map(lambda e: label(e, llm), todo):
+            f.write(json.dumps({**g, "model": args.model}, ensure_ascii=False) + "\n")
+            f.flush()
+    report([args.folder])
 
 
 if __name__ == "__main__":
