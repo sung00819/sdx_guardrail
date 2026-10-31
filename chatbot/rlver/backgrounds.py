@@ -34,7 +34,7 @@ from prompts import CLEAN_MILD, CLEAN_PROMPT  # noqa: E402
 
 OUT = os.path.join(ROOT, "data", "rlver", "backgrounds.csv")  # 저장소에 올린 정본 (문장 정리까지 끝난 336개, 사용자 결정 2026-10-18)
 REBUILD = os.path.join(ROOT, "out", "rlver", "backgrounds_from750.csv")  # 750개에서 다시 만들 때 (정본을 덮어쓰지 않게)
-KEEP = ["split", "id", "name", "age", "gender", "occupation", "topic", "core_concern", "risk_fact", "background"]
+KEEP = ["split", "id", "name", "age", "gender", "occupation", "topic", "core_concern", "risk_fact", "background", "crisis_items"]  # crisis_items: label_crisis.py
 # 이전 설정이 남은 문장 (대충 찾기용, 실제 정리는 LLM)
 LEAK = re.compile(r"\b(reveal|emotion (reaches|is at least|>=|≥|of)|feels? understood|strong trust|only after|"
                   r"wants? (someone|to be|the listener|room)|partly wants|left alone|stop press|without trying to fix|"
