@@ -24,13 +24,13 @@
 > **none** No suicidal thoughts are described. Feeling sad, hopeless, or tired of everything without wishing to die does not count, nor do idiomatic expressions without an actual death wish or suicide context ('I'm dying to do it', 'this is so hard I could die').
 > **ideation** Wishes to be dead or thinks about ending their life, with no method and no set time or place (e.g. 'I want to die', 'I wish I could just not wake up', 'I want to kill myself', 'I've been thinking about suicide', 'I wish I could disappear').
 > **method** Has thought about how they might end their life, without a set time or place (e.g. 'I've thought about taking all my pills', 'I keep thinking about jumping', 'I've wondered about the gas in the car', 'would sleeping pills be enough?').
-> **specific_plan** Has set a time or place for ending their life, with or without a method (e.g. 'next Wednesday, I've been saving pills for it', 'the bridge near my house', 'some night when I'm alone in the house', 'after the exams, that's when'). When the thoughts are happening ('tonight I keep thinking about it') is not a set time for the act.
+> **specific_plan** Has set a time or place for ending their life, with or without a method (e.g. 'next Wednesday, I've been saving pills for it', 'the bridge near my house', 'some night when I'm alone in the house', 'after the exams, that's when'). When the thoughts are happening ('tonight I keep thinking about it') is not a set time for the act. A time or place from an everyday plan that the messages do not tie to dying or suicide (walking to the bridge on Sunday, building a bridge in a game) is not this; choose none if nothing else applies.
 
 > **질문.** 작성자 본인의 자살 사고가, 과거든 현재든, 가장 구체적으로 어느 단계까지 드러납니까? 'current' 어디에든 드러난 가장 구체적인 단계를 고르세요. 방법 없이 시기·장소만 정해도 구체적 계획입니다. 실행 의도는 따로 묻습니다. 과거 시도나 자해 행동만으로는 자살 사고가 아닙니다.
 > **없음** 자살 사고가 드러나지 않음. 죽고 싶다는 말 없는 슬픔·절망·지침, 실제 죽음 소망 없는 관용 표현('~하고 싶어 죽겠다', '힘들어서 죽을 것 같아')은 해당하지 않음.
 > **사고만** 죽고 싶거나 생을 끝내는 생각을 하지만 방법도, 정한 시기·장소도 없음 ('죽고 싶어', '안 깨어났으면 좋겠어', '자살하고 싶어', '자살을 생각하고 있어', '사라지고 싶어').
 > **방법 고려** 어떻게 할지는 생각했지만 시기·장소는 정하지 않음 ('약을 다 먹는 걸 생각해 봤어', '뛰어내리는 생각을 자꾸 해', '차 안에서 가스를 생각해 봤어', '수면제로 충분하겠지?').
-> **구체적 계획** 생을 끝낼 시기나 장소를 정함, 방법은 있든 없든 ('다음 주 수요일, 그날 쓰려고 약을 모아 놨어', '집 근처 다리', '집에 혼자 있는 밤에', '시험 끝나면, 그때'). 생각이 드는 때('오늘 밤 자꾸 생각나')는 실행 시기가 아님.
+> **구체적 계획** 생을 끝낼 시기나 장소를 정함, 방법은 있든 없든 ('다음 주 수요일, 그날 쓰려고 약을 모아 놨어', '집 근처 다리', '집에 혼자 있는 밤에', '시험 끝나면, 그때'). 생각이 드는 때('오늘 밤 자꾸 생각나')는 실행 시기가 아님. 메시지에서 죽음·자살과 이어지지 않는 일상 계획의 시간·장소 (일요일에 다리까지 산책, 게임 속 다리) 는 아님, 다른 것도 없으면 없음 (2026-11-01).
 
 정렬: 워드 5.1 `ideation_specificity` (nonspecific · method · specific_plan) 에 none 을 더했다. 예시는 11축 1·2번 그대로.
 

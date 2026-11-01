@@ -146,7 +146,12 @@ def jev_route(messages, jev, state, native=False, plan=False):
     on = strategy_bank.fired(probs)
     # 한 번 켜진 위험 축은 대화 끝까지 켜 둔다 (2026-10-26 사용자): 날짜·계획을 말한 발화가 3개 창 밖으로 밀리면 위험 축이 꺼지고,
     # 우울 모듈만 남은 턴에서 30B 가 '그건 힘이야', '그냥 평화야' 처럼 떠남·끝을 받아 줬다. 보정 3개는 그대로 턴마다
-    sticky = [k for k in state.setdefault("risk_seen", []) if not on.get(k)]
+    # 2026-11-01: 우울이나 다른 위험 축과 같이 켜진 적이 있는 축만 유지한다. normal 사용자의 '일요일에 다리까지' 처럼
+    # 축 하나만 혼자 켜진 오판이 대화 끝까지 위기 모드로 남았다 (out/rlver/1101)normal_jev_fp.md)
+    risk_now = [k for k in strategy_bank.RISK_AXES if on.get(k)]
+    if len(risk_now) > 1 or on.get("depression"):
+        state.setdefault("risk_backed", []).extend(k for k in risk_now if k not in state.get("risk_backed", []))
+    sticky = [k for k in state.setdefault("risk_seen", []) if not on.get(k) and k in state.get("risk_backed", [])]
     new = [k for k in strategy_bank.RISK_AXES if on.get(k) and k not in state["risk_seen"]]
     state["risk_seen"] += new
     for k in sticky:
