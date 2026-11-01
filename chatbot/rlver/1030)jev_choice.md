@@ -69,12 +69,12 @@
 ## 4. self_harm — 자해
 
 > **Q.** Has the writer deliberately hurt their own body, now or in the past, and if so, once or more than once? Count cutting, burning, hitting themselves, and taking extra pills to hurt themselves, whether it was to cope, release tension, punish themselves, feel something, or with an unclear or mixed intent. Urges without acting do not count.
-> **none** No self-harm act is described, or urges only ('I want to cut').
+> **none** No self-harm act is described, or urges only ('I want to cut'). Drinking alcohol or using drugs is none here, even when described as a relapse or a way to feel something (that is substance use).
 > **once** One self-harm episode, or an act with no sign that it happened more than once, including indirect wording when the context is self-harm and marks on their own body that they made (e.g. 'I cut last night', 'the first time was last night', 'I did it once', 'I took a few extra pills, I wasn't trying to die, I just wanted to feel something', 'tiny lines, I tell people it's the cat').
 > **repeated** More than one episode, a recurring pattern, or recurrence after stopping (e.g. 'I've done it several times in the past two months', 'a few times a month for about a year', 'I started again after stopping for months', 'I relapsed', 'broke my streak', 'every time there's a fight at home', 'on and off since high school').
 
 > **질문.** 작성자가 지금이나 과거에 일부러 자기 몸을 다치게 한 적이 있다면, 한 번입니까 여러 번입니까? 긋기, 화상, 스스로 때리기, 다치려고 약 더 먹기를 목적·의도와 상관없이 셉니다. 행동 없는 충동은 세지 않습니다.
-> **없음** 자해 행동이 없거나 충동만 있음 ('긋고 싶어').
+> **없음** 자해 행동이 없거나 충동만 있음 ('긋고 싶어'). 술을 마시거나 약물을 쓴 것은 '다시 시작했다', '뭐라도 느끼려고' 라고 해도 없음 (물질 사용, 2026-11-01).
 > **한 번** 한 번이거나 반복 기색이 없는 행동. 맥락상 자해인 간접 표현, 스스로 낸 흔적 포함 ('어젯밤에 그었어', '어젯밤이 처음이었어', '한 번 했어', '죽으려던 건 아니고 뭔가 느끼고 싶어서 약을 몇 알 더 먹었어', '작은 줄들, 고양이가 그랬다고 해').
 > **반복** 두 번 이상, 되풀이되는 패턴, 멈췄다가 다시 함 ('두 달 동안 여러 번 했어', '1년 정도 한 달에 몇 번씩', '몇 달 멈췄다가 다시 시작했어', '또 했어(relapse)', '기록이 깨졌어', '집에서 싸울 때마다', '고등학교 때부터 했다 말았다').
 
