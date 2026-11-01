@@ -80,6 +80,27 @@ FOLLOW = ("They have already shown how they want you to respond: {label}. Keep r
 OFFER = ("This is your first reply to their low mood. After briefly reflecting what they said, offer them in one warm, plain "
          "sentence three ways to go on: letting it out while you listen, you really trying to understand what it is like for "
          "them, or thinking together about what to do. Let them choose; do not number or label the options.")
+# 2026-11-01: OFFER 는 71개 중 59개가 물음표 없는 평서문이라 사용자가 고르지 않고 하던 얘기를 이어 갔다 → 질문으로 끝내는 판 (--offer question)
+OFFER_QUESTION = ("This is your first reply to their low mood. Reflect what they said in one short sentence, then end with one warm, "
+                  "plain question that lets them choose how to go on: whether you should mainly listen while they let it out, try to "
+                  "really understand what it is like for them, or think together about what to do. Put all three in that one "
+                  "question; do not number or label them, and ask nothing else.")
+# 2026-11-01 v2 (--offer question2, 권하기 확인·다시 쓰기와 함께): 상황에 맞춘 말로 세 방식을 구분되게, 시작 반영도 상투어 금지.
+# 상투 시작 59 → 31, 끝 감정 +1.5 [+0.0, +3.0] 이었지만 방식 판정 맞음 50 → 43 이라 사용자가 v1 을 기본으로 (1101)need_llm_q2_30b)
+OFFER_QUESTION2 = ("This is your first reply to their low mood. Start by reflecting one specific thing they said, in their own details "
+                  "(not a stock opener such as \"That sounds like a deep kind of tired\" or \"That sounds really heavy\"). Then end "
+                  "with one warm question that lets them choose how to go on, offering all three ways in words that fit their "
+                  "situation and are clearly different from each other: (1) you mainly listen while they let it out, (2) you try "
+                  "to really get what this is like for them, (3) you work out together what to do about it. For example, for a "
+                  "friend who stopped calling: \"Do you want to just get it all out, have me really get why her silence stings "
+                  "so much, or figure out whether to reach out to her?\"; for a work mistake: \"Should I just listen while you "
+                  "vent about it, try to understand what made that moment hit so hard, or think through what to say to your "
+                  "manager tomorrow?\" Do not copy these; do not number or label the ways, and ask nothing else.")
+# 답에서 방식이 안 드러났을 때 한 번만 더 묻는다 (--reoffer)
+OFFER_AGAIN = ("You asked how they would like to talk, but their answer did not show it. Reflect what they just said, then ask once "
+               "more, briefly and lightly, which would help more right now: you listening, you really trying to understand what "
+               "it is like for them, or thinking together about what to do. Do not ask about this again after this reply.")
+OFFERS = {True: OFFER, "once": OFFER, "question": OFFER_QUESTION, "question2": OFFER_QUESTION2, "again": OFFER_AGAIN}
 OFFERED = ("You already offered them a choice of how to talk. Do not offer it again or ask what would help; keep listening "
            "(Listening is the safe default) and follow whatever they show.")
 
@@ -172,7 +193,8 @@ def plan_block(on, need=None, offer=False, fill=None, done=None, new=None):
 
 # 2026-10-26: '질문 하나' 칸만 있으니 30B 가 반영 없이 질문만 던졌다 (답 43 → 28단어, 끝 감정 71.7 → 52.9) → 반영 칸을 먼저, 질문은 필요할 때만.
 # 반영 칸을 넣자 떠남·끝을 사랑·안도로 되짚은 답이 2개 나와서 금지 문구를 붙였다
-PLAN_LINES = ("What they said that shows it:", "Any other risk sign I notice:",
+# 2026-11-01 사용자: 'Any other risk sign I notice' 칸은 뺀다 (위험 신호는 Jev 가 전달한다고 본다)
+PLAN_LINES = ("What they said that shows it:",
               "How I will reflect their feeling (in their words, specific; never echo dying, leaving or an ending as love, strength or relief):",
               "The one question I will ask (only if needed, or none):", "What to avoid:")
 # 미리 채운 <think> 를 이어 쓰게 할 때 (자체 생각 모드 없는 챗봇): 남은 칸을 채우고 </think> 뒤에 답
@@ -202,7 +224,7 @@ def assemble_route(bank, on, need=None, native=False, offered=False, offer=False
             out.append(bank["strategies"][need]["text"] + "\n\n" + FOLLOW.format(label=bank["strategies"][need]["label"]))
         else:
             out.append("\n\n".join([bank["strategy_intro"]] + [v["text"] for v in bank["strategies"].values()]
-                                     + ([OFFER] if offer else [OFFERED] if offered else [])))
+                                     + ([OFFERS[offer]] if offer else [OFFERED] if offered else [])))
     if r["mods"]:
         out.append("Added factors:\n\n" + "\n\n".join(bank["crisis"][k]["text"] for k in r["mods"]))
     if r["general"]:

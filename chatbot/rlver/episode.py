@@ -11,6 +11,7 @@ import difflib
 import re
 
 import bank as strategy_bank
+import need_llm
 from prompts import CHATBOT, REPLY_FORMAT, TAG_FORMAT, TAG_REPLY
 from simulator import SageUser
 
@@ -114,6 +115,15 @@ REDO_NOTE = ("Your draft for this turn nearly repeated an earlier reply of yours
              "they just said and take the next step in the plan, without reusing those sentences.")
 
 
+OFFER_REDO_NOTE = ("Your draft for this reply was:\n\"{draft}\"\nIt was meant to let them choose how to go on, but it leaves out: "
+                   "{missing}. Write it again: reflect something specific they said, then one question that offers all three ways "
+                   "in words that fit their situation, clearly different from each other.")
+
+
+def route_now(turns):
+    return turns[-1].get("route", {})
+
+
 def plan_then_reply(bot, messages, block, temperature=None):
     """자체 생각 모드 없는 챗봇 (30B Instruct) 의 bank_jev_plan: 두 번 부른다 (2026-10-26).
     한 번에 이어 쓰게 하면 </think> 를 닫지 않고 'Reply format:' 뒤에 답을 섞어 쓴다.
@@ -134,12 +144,17 @@ def plan_then_reply(bot, messages, block, temperature=None):
 
 def jev_route(messages, jev, state, native=False, plan=False):
     """bank_jev (2026-10-25): 사용자 최근 발화 3개 → Jev 13축 P(예) → 0/1 → 1025)bank.json 모듈 조합.
-    원하는 방식 (2026-10-26 사용자): 우울이 처음 켜진 턴에 챗봇이 세 방식을 한 번 권하고, 그 다음 사용자 답에서만 Jev 로 감지한다.
-    거기서 안 잡히면 경청 기본값, 다시 묻지 않는다.
+    원하는 방식 (2026-10-26 사용자): 우울이 처음 켜진 턴에 챗봇이 세 방식을 권하고, 그 다음 사용자 답에서만 감지한다.
+    2026-11-01: 감지는 Jev 대신 30B (state["need_llm"], need_llm.judge_need), 권하기는 질문으로 끝냄 (offer_style),
+    모름이면 한 번 더 묻고 (reoffer) 그래도 안 잡히면 경청 기본값.
     state: {"need": 잡힌 방식, "offered": 권했는지, "await": 이번 사용자 발화가 권한 것에 대한 답인지, "risk_seen": 켜진 적 있는 위험 축}
     plan: bank_jev_plan → (시스템 프롬프트, 미리 채울 <think> 또는 None). 자체 생각 챗봇은 계획을 시스템 프롬프트에 넣는다"""
     ask = state["await"]
-    probs, need = jev.judge(messages, need=ask)
+    if state.get("need_llm"):  # 2026-11-01 사용자: 방식은 Jev 대신 30B 가 고른다 (need_llm.judge_need, 모름이면 None)
+        probs, _ = jev.judge(messages, need=False)
+        need = need_llm.judge_need(messages, state["need_llm"]) if ask else None
+    else:
+        probs, need = jev.judge(messages, need=ask)
     if ask:
         state["await"] = False
         state["need"] = need or state["need"]
@@ -158,11 +173,16 @@ def jev_route(messages, jev, state, native=False, plan=False):
         on[k] = 1
     route = strategy_bank.route(on)
     # 정서 지원 (우울) 의 첫 답에서만 방식을 한 번 권한다. 일반 대화 (normal) 는 묻지 않고 자연스럽게 (2026-10-26 사용자)
-    offer = route["emotional"] and not state["offered"] and state["need"] is None
+    # 2026-11-01 --reoffer: 답에서 방식이 안 드러나면 바로 다음 답에서 한 번 더 묻는다 (최대 두 번)
+    n = state.get("offers", 0)
+    offer = route["emotional"] and state["need"] is None and (n == 0 or (ask and n < (2 if state.get("reoffer") else 1)))
+    if offer:
+        offer = "again" if n else state.get("offer_style", "once")
     bank = strategy_bank.load(strategy_bank.BANK_1025)
     text = strategy_bank.assemble_route(bank, on, need=state["need"], native=native, offered=state["offered"], offer=offer)
     if offer:
         state["offered"] = state["await"] = True
+        state["offers"] = n + 1
     prefill = None
     # 자체 생각 없는 챗봇 (30B) 은 위험 축이 켜진 턴에만 계획 칸을 쓴다 (2026-10-26 사용자: 계획 칸 약 210토큰 + 두 번 호출이
     # 지연을 키운다). 우울·일반 턴은 계획 없이 한 번에 답만 쓰게 한다. 2026-10-31: 자체 생각 챗봇 (8B) 도 같게
@@ -187,8 +207,10 @@ def jev_route(messages, jev, state, native=False, plan=False):
                          "sticky": sticky}, prefill
 
 
-def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=True, jev=None):
-    """jev: template bank_jev·bank_jev_plan 일 때 jev.Jev (판정기)"""
+def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=True, jev=None, need_opts=None):
+    """jev: template bank_jev·bank_jev_plan 일 때 jev.Jev (판정기)
+    need_opts (2026-11-01): {"need_llm": 방식 판정 Chat (없으면 Jev), "offer_style": "once"|"question"|"question2", "reoffer": bool}"""
+    need_opts = need_opts or {}
     emo, ep = cfg["emotion"], cfg["episode"]
     assert template not in ("bank_jev", "bank_jev_plan") or jev is not None, "bank_jev 는 jev 판정기가 필요하다"
     user = SageUser(profile, sim_llm, emo)
@@ -196,7 +218,8 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
     messages = [{"role": "system", "content": system_prompt(profile, template, getattr(bot, "native_think", False))}, {"role": "user", "content": first}]
     turns, end = [{"user": first, "user_thinking": first_thinking, "emotion": user.emotion}], "max_turns"
     native = getattr(bot, "native_think", False)
-    jev_state = {"need": None, "offered": False, "await": False}
+    jev_state = {"need": None, "offered": False, "await": False,
+                 **{k: need_opts[k] for k in ("need_llm", "offer_style", "reoffer") if need_opts.get(k)}}
     for _ in range(ep["max_turns"]):
         prefill = None
         if template in ("bank_jev", "bank_jev_plan"):
@@ -217,8 +240,24 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
                                         "respond to their newest message with new words.\n", 1) if prefill else None)
                 raw = plan_then_reply(bot, retry, head, temperature=1.0) if prefill else bot(retry, temperature=1.0)
                 reply, ok = parse_bot(raw, fmt)
+        # 2026-11-01 (--offer question2): 방식을 권한 답에 세 방식이 다 있는지 30B 가 보고, 빠졌으면 다시 쓰게 한다 (최대 2번).
+        # 질문형 권하기에서 30B 가 조언이나 공감 선택지를 빼먹었다 (세 방식 다 13/72)
+        offer_missing = []
+        if (prefill is None and route_now(turns).get("offer") and jev_state.get("need_llm") and jev_state.get("offer_style") == "question2"):
+            for _ in range(2):
+                offer_missing = need_llm.offer_missing(reply, jev_state["need_llm"])
+                if not offer_missing:
+                    break
+                redo += 1
+                note = OFFER_REDO_NOTE.format(draft=reply, missing="; ".join(offer_missing))
+                raw = bot([{**messages[0], "content": messages[0]["content"] + "\n\n" + note}] + messages[1:])
+                reply, ok = parse_bot(raw, fmt)
+            else:
+                offer_missing = need_llm.offer_missing(reply, jev_state["need_llm"])
         if not reply:
             reply, ok = "...", False
+        if offer_missing:
+            turns[-1]["offer_missing"] = offer_missing
         step = user.step(reply)
         # 학습 샘플: 이 턴의 입력(messages) + 원문 답(raw, 생각 블록 포함). 지난 턴의 생각 블록은 입력에 남기지 않는다 (공식 코드)
         turns[-1].update(prompt=[dict(m) for m in messages], bot_raw=raw, bot=reply, format_ok=ok, redo=redo)

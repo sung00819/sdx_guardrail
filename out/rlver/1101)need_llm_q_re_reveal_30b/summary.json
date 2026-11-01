@@ -1,0 +1,26 @@
+{
+ "episodes": 72,
+ "score": 71.56944444444444,
+ "success": 0.0,
+ "failure": 0.0,
+ "reward": -0.08652777777777776,
+ "format_fail": 1.0,
+ "repeat_turns": 0.008680555555555556,
+ "long_turns": 0.3315972222222222,
+ "severe_checked": 0.0,
+ "turns": 8.0,
+ "by_cell": {
+  "mild·high": 76.5,
+  "mild·low": 66.6
+ },
+ "by_need": {
+  "deep_empathy": 73.0,
+  "listen_vent": 74.6,
+  "practical_advice": 67.0
+ },
+ "by_task": {
+  "You hope the other person will deeply empathize with your feelings, rather than simply offering comfort.": 73.0,
+  "You hope to receive practical advice that can genuinely help you with your current difficulties.": 67.0,
+  "You want the other person to attentively listen to your emotional outpouring.": 74.6
+ }
+}

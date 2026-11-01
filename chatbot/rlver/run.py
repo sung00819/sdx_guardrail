@@ -85,6 +85,11 @@ def main():
     ap.add_argument("--template", choices=["bank", "bank_jev", "bank_jev_plan", "bank_oracle", "base", "guide", "think", "nothink", "sage", "plain", "plain_len"], default="bank",
                     help="bank = 전략 뱅크 (STRATEGY.md), bank_jev = 턴마다 Jev 13축으로 1025)bank.json 모듈 조합, bank_jev_plan = 거기에 Jev·뱅크로 채운 계획 칸을 <think> 앞에, base = bank 에서 뱅크만 뺀 것, bank_oracle = 원하는 방식·위험을 알려 준 상한, guide = 짧은 지침, think·nothink = RLVER 원래")
     ap.add_argument("--judge", default="jev", choices=["jev", "kev", "clm"], help="bank_jev 판정기")
+    ap.add_argument("--need_judge", choices=["jev", "llm"], default="llm",
+                    help="원하는 방식 판정. 2026-11-01 사용자: 기본 llm (시뮬레이터 30B, need_llm.judge_need), jev 는 이전 실행 재현용")
+    ap.add_argument("--offer", choices=["once", "question", "question2"], default="question",
+                    help="방식 권하기: question = 짧은 질문으로 끝냄 (기본), question2 = 상황 맞춤 + 세 방식 확인·다시 쓰기, once = 이전 OFFER")
+    ap.add_argument("--no_reoffer", dest="reoffer", action="store_false", help="답에서 방식이 안 드러나도 다시 묻지 않는다 (이전 동작)")
     ap.add_argument("--samples", type=int, default=1, help="프로필마다 대화 수 (GRPO 그룹 크기)")
     ap.add_argument("--no_first_talk", action="store_true", help="테스트 프로필의 고정 첫 발화 대신 시뮬레이터가 연다")
     ap.add_argument("--workers", type=int, default=32)
@@ -133,9 +138,12 @@ def main():
     json.dump({**vars(args), "chatbot_cfg": bot_cfg}, open(os.path.join(args.out, "run_args.json"), "w"), indent=1)
     print(f"사용자 (배경 × 설정) {len(profiles)} × 표본 {args.samples} → 남은 대화 {len(jobs)}")
 
+    need_opts = {"offer_style": args.offer, "reoffer": args.reoffer,
+                 "need_llm": Chat({**cfg["simulator"], "temperature": 0}) if args.need_judge == "llm" else None}
+
     def one(job):
         p, s = job
-        ep = run_episode(p, bot, sim, cfg, args.template, use_first_talk=not args.no_first_talk, jev=judge)
+        ep = run_episode(p, bot, sim, cfg, args.template, use_first_talk=not args.no_first_talk, jev=judge, need_opts=need_opts)
         extra = {k: p.get(k) for k in ("setting", "need", "effort")}  # event·disclosure 는 episode 가 넣는다
         return {**ep, **extra, "sample": s, "chatbot": bot_cfg["model"]}
 

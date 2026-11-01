@@ -85,6 +85,8 @@ Emotion-C: low emotion. Your dialogue experience is relatively negative and your
 Emotion-F: your emotion has reached the most negative level and you don't want to continue. Say goodbye to end the conversation."""
 
 # 응답 생성 f_reply. 같은 질문 되풀이 금지·제안을 들으면 반응하고 넘어가기 (2026-10-19 사용자 결정: "그래서 어떻게 해야 돼?" 반복)
+# 2026-11-01 사용자: 'do not reveal the hidden intention' 이 PURPOSE 의 '방식을 고르게 하면 말하라' 와 부딪혀 NPC 가 방식을 물어도
+# 숨겼다 (방식을 직접 말한 답 20/71) → 물었을 때만 말한다는 예외를 넣었다. 이전 실행 (1025)·1031)) 은 예외 없는 판
 REPLY = """You are an actor. You will play the role defined by the character persona and background in the script and have a conversation with an NPC.
 
 # Your task
@@ -102,7 +104,7 @@ REPLY = """You are an actor. You will play the role defined by the character per
 # Reply ideas
 Using your feelings about the NPC's latest reply, the persona, the background and the hidden intention, think about:
 1. Should your attitude now be positive, neutral or negative?
-2. What is the goal of this reply? (You do not need to respond to every word. You can hint at your needs, but do not reveal the hidden intention.)
+2. What is the goal of this reply? (You do not need to respond to every word. You can hint at your needs, but do not reveal the hidden intention, except when the NPC has just asked how you would like to talk or what would help: then say in your own words what you want, as in "How you say what you want" in the background.)
 3. What tone, style and content fit the persona and your current emotion?
 
 # Speaking style
