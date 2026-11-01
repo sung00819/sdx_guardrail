@@ -110,79 +110,140 @@ SIGNAL = {"obtain_means": "got or looked for means", "suicide_note": "wrote a su
           "repeated_self_harm": "repeated self-harm", "cannot_stay_safe": "cannot keep themselves safe", "means_access": "lethal means at hand",
           "method": "thinking about a method", "depression": "low mood", "acute_context": "a major recent stressor",
           "psych_history": "psychiatric history", "substance_use_disorder": "substance use problem"}
-# 축마다 이번 턴에 할 일 (자살 생각·계획·수단·안전 확인은 아래 단계 SAFETY_STEPS 가 맡는다, 2026-10-26: 축 줄에도 자살 질문이 들어 있어
-# '이미 물었음' 과 '물어라' 가 한 줄에 같이 나오고, 30B 가 '응' 이라고 답한 뒤에도 같은 질문을 되풀이했다)
-MUST = {"obtain_means": "help put distance between them and what they got",
-        "suicide_note": "say gently you take the note seriously; do not comment on its content",
-        "put_affairs_in_order": "say gently that it sounds a bit like getting ready to leave (that is why you ask)",
-        "specific_plan": "treat it as close danger; connect them with {CRISIS_LINE} now",
-        "nonsuicidal_self_harm": "ask whether they are hurt now and need care",
-        "repeated_self_harm": "ask whether they are hurt now and whether it has got worse lately",
-        "cannot_stay_safe": "ask where they are and who can be with them; connect them with {CRISIS_LINE} now",
-        "means_access": "help them put the means away or hand it to someone",
-        "method": "do not comment on whether the method would work",
-        "acute_context": "acknowledge the event",
-        "substance_use_disorder": "check whether they have been drinking or using right now",
-        "psych_history": "ask what has helped before; suggest their doctor or therapist"}
+# 2026-11-01 사용자: 계획 칸은 위험 모드 전용으로 다시 짠다 (They want 없음, 우울은 신호에서 뺌).
+# 전에는 축 줄 (MUST) 이 안전 확인 단계와 겹쳐 109·위치 확인을 매 턴 시켰고 (안전 유지 불가가 KEEP_MUST), 단계를 다 해도 109 를 되풀이했다.
+# 이제 한 턴 = 안전 확인 한 단계 + 축 행동 최대 한 줄 (질문은 하나), 축의 주의는 Avoid 줄로 따로.
+# 축마다 한 번 하는 행동 (text, 질문인지). 모든 위험·보정 축에 하나씩 (2026-11-01 사용자). 안전 확인 단계 (자살 생각·계획·
+# 수단 위치·안전·109) 와 겹치는 일은 넣지 않고, 위기 지침 (1025)bank.json crisis) 에서 그 축에만 있는 것을 가져왔다.
+# 우선순위 순서: 자해 (다쳤는지) > 급한 축 (구체적 계획·안전 유지 불가) > 수단 > 유서·물건 정리·방법 > 보정
+AXIS_ACTION = {
+    "nonsuicidal_self_harm": ("ask whether they are hurt right now and need care", True),
+    "repeated_self_harm": ("ask whether they are hurt right now and whether it has got worse lately", True),
+    "specific_plan": ("say that even if the day is still some time away you take it as close danger, and that you want to work out "
+                      "with them who could be with them on that day", False),
+    "cannot_stay_safe": ("say that you will stay in the conversation with them while they reach out for help", False),
+    "obtain_means": ("say that getting it is a serious step and that you are glad they told you", False),
+    "means_access": ("say plainly that having it close makes this more dangerous, and that putting distance between them and it helps", False),
+    "suicide_note": ("say gently that you take the note seriously", False),
+    "put_affairs_in_order": ("say gently that it sounds a bit like getting ready to leave, and that this is why you ask", False),
+    "method": ("acknowledge, without shock, that they have thought about how", False),
+    "acute_context": ("acknowledge what happened to them", False),
+    "substance_use_disorder": ("check whether they have been drinking or using right now", True),
+    "psych_history": ("ask what has helped before, and suggest their doctor or therapist", True),
+}
+SELF_HARM = {"nonsuicidal_self_harm", "repeated_self_harm"}
+# 보정 축의 질문은 안전 확인 단계가 다 끝난 뒤에만 (그전에는 줄에서 기다린다: 단계를 밀어내지 않게)
+LATE_QUESTION = {"substance_use_disorder", "psych_history"}
+ACTION_ORDER = list(AXIS_ACTION)
+# 켜져 있는 동안 피할 것 (최대 3개, 이 순서로)
+AXIS_AVOID = {
+    "specific_plan": "do not discuss the details of the plan",
+    "cannot_stay_safe": "do not try to calm them only through talk or ask them to promise to stay safe",
+    "method": "do not comment on whether the method would work",
+    "suicide_note": "do not comment on the note's content",
+    "put_affairs_in_order": "do not praise it as tidying up or being responsible",
+}
 MEANS_AXES = {"obtain_means", "means_access", "method", "specific_plan"}
-KEEP_MUST = {"obtain_means", "means_access", "cannot_stay_safe"}  # 수단·안전은 켜져 있는 동안 계속, 나머지 축 줄은 처음 켜진 턴에만
-# 위험이 켜진 동안의 안전 확인 단계. 앞 답에서 이미 한 단계는 건너뛰고, 이번 턴에는 다음 한 단계만 한다
-SAFETY_STEPS = [
-    ("suicide", "ask directly whether they are thinking about ending their life"),
-    ("plan", "they already answered whether they think about ending their life; do not ask it again. Now ask whether they have a plan or a time in mind"),
-    ("means", "do not ask again about suicide or a plan. Ask whether the means is nearby and where it is right now"),
-    ("safety", "do not repeat earlier questions. Check whether they are safe right now and whether someone can be with them; offer {CRISIS_LINE}"),
-]
-STEPS_DONE = ("the safety questions are done; do not repeat them. Stay with them, help them agree on one person to contact today "
-              "and check whether they reached out")
+MEANS_FIRST = {"means_access", "obtain_means"}  # 수단 위치를 맨 먼저 (2026-10-26: 뒤에 두면 2턴 안에 묻는 비율 84 → 43%)
+URGENT = {"specific_plan", "cannot_stay_safe"}  # 자살 생각이 확인되면 바로 '지금 안전한지 · 109'
+# 안전 확인 단계 (상태는 30B 가 대화 전체를 보고 판정, need_llm.safety_status)
+STEP_NAME = {"suicide": "thoughts of suicide", "plan": "a plan or a time", "means": "where the means is", "safety": "safe now / crisis line"}
+STEP_ASK = {"suicide": "ask directly whether they are thinking about ending their life",
+            "plan": "ask whether they have a plan, a time or a place in mind",
+            "means": "ask where the means is right now or how close they are to it (for a place, whether they can easily get there), then help them put distance between themselves and it",
+            "safety": "check whether they are safe right now and whether someone can be with them; offer {CRISIS_LINE}"}
+STATUS_TEXT = {"answered": "answered", "no_answer": "asked, not answered yet", "declined": "they declined", "not_asked": "not asked yet"}
+# 2026-11-01: 단계를 다 한 뒤에도 '연락할 사람 정하기' 를 매 턴 시켜 위험 턴의 93% 가 질문으로 끝났다 (1101)plan_v3_30b_50,
+# 질문 있는 턴 뒤 감정 +0.8, 없는 턴 +4.3) → 연락할 사람은 한 번만, 그 뒤로는 질문 없이 곁에 있기
+STEPS_CONTACT = "the safety questions are done; gently help them think of one person they could reach out to today"
+STEPS_DONE = "the safety questions are done; ask no more safety questions. Stay with them and support them warmly"
+REST = "no safety question this turn: reflect what they said and support them; the next safety question can wait"
+ANSWER_FIRST = "they asked you something: first answer it briefly and concretely"
 
 
-MEANS_FIRST = {"means_access", "obtain_means"}
-MEANS_FIRST_STEP = "ask where the means is right now (before anything else), then help them put it away"
+def step_order(risk):
+    """켜진 위험 축 → 안전 확인 단계 순서"""
+    risk = set(risk)
+    means = bool(MEANS_AXES & risk)
+    first = bool(MEANS_FIRST & risk)
+    urgent = bool(URGENT & risk)
+    order = (["means"] if first else []) + ["suicide"] + (["safety"] if urgent else []) + ["plan"]
+    order += (["means"] if means and not first else []) + ([] if urgent else ["safety"])
+    return order
 
 
-def safety_step(done, means, means_first=False):
-    """done: {"suicide","plan","means","safety": 앞 답에서 이미 했는지} → 이번 턴에 할 한 단계.
-    means_first: 수단 접근·방법 마련이 켜짐 → 수단 위치를 맨 먼저 (2026-10-26: 자살 → 계획 → 수단 순서로 두자
-    수단을 2턴 안에 묻는 비율이 84 → 43% 로 떨어졌다. 뱅크 3.8 은 '수단을 말한 바로 다음 답에서')"""
-    if means_first and not done.get("means"):
-        return MEANS_FIRST_STEP
-    for key, text in SAFETY_STEPS:
-        if key == "means" and not means:
-            continue
-        if not done.get(key):
-            return text
-    return STEPS_DONE
+def next_step(order, status, revisited=(), retry=()):
+    """→ (단계, 다시 돌아오는지) 또는 (None, False) = 다 끝남.
+    안 물은 단계부터 차례로, 그다음 물었는데 답이 없던 단계에 한 번 돌아온다. 거절한 단계는 다시 하지 않는다
+    (새 위험 축이 켜지면 retry 로 한 번 더)"""
+    for s in order:
+        if status.get(s, "not_asked") == "not_asked" or (status.get(s) == "declined" and s in retry):
+            return s, False
+    for s in order:
+        if status.get(s) == "no_answer" and s not in revisited:
+            return s, True
+    return None, False
 
 
-WANT = {"listen_vent": "Listening (let them get it out)", "deep_empathy": "Deep empathy (show you really get what it is like for them)",
-        "practical_advice": "Advice (one or two concrete options)"}
+def pick_action(queue, step, allow_question=True):
+    """줄에서 이번 턴의 축 행동 하나 (우선순위 순서). 보정 축 질문은 안전 확인이 다 끝난 뒤에만, 쉬는 턴에는 질문 행동을 미룬다"""
+    cand = sorted((k for k in queue if not (k in LATE_QUESTION and step is not None) and (allow_question or not AXIS_ACTION[k][1])),
+                  key=ACTION_ORDER.index)
+    return cand[0] if cand else None
 
 
-def plan_block(on, need=None, offer=False, fill=None, done=None, new=None):
-    """<think> 앞부분. 코드가 채우는 줄 (Jev signals · They want · Must do) + 모델이 채울 빈 줄.
-    done: 앞 답에서 이미 한 안전 확인 {"suicide","plan","means","safety"} → 위험이 켜진 동안 다음 한 단계만 (SAFETY_STEPS)"""
-    done = done or {}
+def merged(action, step, risk):
+    """급한 축이 켜졌고 이번 단계가 '지금 안전한지' 인데 자해 질문이 걸리면 한 질문으로 합친다 (단계를 미루지 않게)"""
+    return bool(action in SELF_HARM and step == "safety" and URGENT & set(risk))
+
+
+def uses_step(action, step, risk):
+    """이번 턴에 안전 확인 단계를 실제로 시키는지 (축 행동이 질문이면 그 질문만, 합친 경우는 시킨다)"""
+    return step is not None and (not (action and AXIS_ACTION[action][1]) or merged(action, step, risk))
+
+
+def plan_block(on, fill=None, status=None, notes=None, action=None, step=None, revisit=False, ask_step=True, answer_first=False,
+               contact=False):
+    """위험 턴의 <think> 앞부분. 코드가 채우는 줄 (Risk signs · Safety check so far · This turn · Avoid) + 모델이 채울 빈 줄.
+    status: {단계: answered|no_answer|declined|not_asked}, notes: {단계: 사용자가 한 말 몇 단어} (need_llm.safety_status).
+    action: 이번 턴의 축 행동 (AXIS_ACTION 키) 또는 None. step: next_step 이 고른 단계 (None 이면 다 끝남).
+    ask_step: 이번 턴에 그 단계를 묻는지 (False = 쉬는 턴, episode 가 정한다). answer_first: 사용자가 물었으면 먼저 답하기.
+    contact: 단계를 다 한 뒤 처음 한 번 '연락할 사람'"""
+    status, notes = status or {}, notes or {}
     r = route(on)
-    if r["general"]:  # 일반 대화 (normal 등): 방식은 묻지 않고 자연스럽게 (2026-10-26 사용자)
+    if not r["risk"]:  # 계획 칸은 위험 턴에만 쓴다 (episode.jev_route). 남은 경우를 위해 일반 칸
         return "<think>\nWhat they want to talk about:\nHow I will respond to it (specific to their details):"
-    sig = [SIGNAL[k] for k in r["risk"] + (["depression"] if r["emotional"] else []) + r["mods"]]
-    new = set(r["risk"] if new is None else new)  # 이번 턴에 처음 켜진 위험 축
-    must = [MUST[k] for k in r["risk"] if k in new or k in KEEP_MUST]
-    if r["risk"]:
-        must.append(safety_step(done, bool(MEANS_AXES & set(r["risk"])), bool(MEANS_FIRST & set(r["risk"]))))
-    elif done.get("suicide"):
-        must.append("you already asked about suicidal thoughts; do not ask it again unless a new risk sign appears")
-    must += [MUST[k] for k in r["mods"]]
-    if offer:
-        want = "not known yet; this turn, offer the three ways once (listen / understand / think what to do)"
-    elif need:
-        want = WANT[need] + "; do not ask again how they want to talk"
+    order = step_order(r["risk"])
+    sig = [SIGNAL[k] for k in r["risk"] + r["mods"]]
+    so_far = "; ".join(f"{STEP_NAME[s]}: {STATUS_TEXT[status.get(s, 'not_asked')]}" + (f" ({notes[s]})" if notes.get(s) and status.get(s) == "answered" else "")
+                       for s in order)
+    todo = [ANSWER_FIRST] if answer_first else []
+    if merged(action, step, r["risk"]) and ask_step:
+        todo.append("ask whether they are hurt or in danger right now and whether someone can be with them; if they are hurt, "
+                    "point them to {EMERGENCY} now, otherwise offer {CRISIS_LINE}")
     else:
-        want = "not shown; keep Listening as the default and do not ask again"
-    lines = ["<think>", f"Jev signals: {', '.join(sig)}", f"They want: {want if r['emotional'] else '-'}"]
-    if must:
-        lines.append("Must do this turn: " + "; ".join(dict.fromkeys(must)))
+        if action:
+            todo.append(AXIS_ACTION[action][0])
+        if action and AXIS_ACTION[action][1]:  # 축 행동이 질문이면 이번 턴은 그 질문만 (질문은 하나)
+            pass
+        elif step is None:
+            todo.append(STEPS_CONTACT if contact else STEPS_DONE)
+        elif not ask_step:
+            todo.append(REST)
+        elif revisit:
+            todo.append(f"earlier you asked about {STEP_NAME[step]} and they did not answer; come back to it once, gently: {STEP_ASK[step]}")
+        elif step == "means" and notes.get("means"):  # 위치를 이미 말했으면 다시 묻지 말고 거리 두기만
+            todo.append(f"they told you where it is ({notes['means']}); do not ask where again. Help them put distance between "
+                        "themselves and it right now (another room, giving it to someone, leaving the place)")
+        else:
+            todo.append(STEP_ASK[step])
+    if status.get("safety") == "declined" and step != "safety":
+        todo.append("they declined {CRISIS_LINE}; do not offer it again unless a new risk sign appears")
+    avoid = [AXIS_AVOID[k] for k in AXIS_AVOID if k in r["risk"]][:3]
+    lines = ["<think>", f"Risk signs: {', '.join(sig)}", f"Safety check so far: {so_far}",
+             "This turn: " + "; ".join(todo) + ". Do not ask again what they already answered."]
+    if avoid:
+        lines.append("Avoid: " + "; ".join(avoid))
     lines += ["What they said that shows it:"]
     text = "\n".join(lines)
     for k, v in (fill or {}).items():
@@ -196,18 +257,65 @@ def plan_block(on, need=None, offer=False, fill=None, done=None, new=None):
 # 2026-11-01 사용자: 'Any other risk sign I notice' 칸은 뺀다 (위험 신호는 Jev 가 전달한다고 본다)
 PLAN_LINES = ("What they said that shows it:",
               "How I will reflect their feeling (in their words, specific; never echo dying, leaving or an ending as love, strength or relief):",
-              "The one question I will ask (only if needed, or none):", "What to avoid:")
+              "The one question I will ask (the one in 'This turn', or none):", "What to avoid:")
 # 미리 채운 <think> 를 이어 쓰게 할 때 (자체 생각 모드 없는 챗봇): 남은 칸을 채우고 </think> 뒤에 답
-PLAN_TAIL = ("Your thinking already starts with a short plan whose first lines are decided for you (Jev signals, what they want, "
-             "what you must do this turn). Continue it by filling in, one line each: " + " / ".join(PLAN_LINES)
+PLAN_TAIL = ("Your thinking already starts with a short plan whose first lines are decided for you (risk signs, where the safety "
+             "check stands, what to do this turn, what to avoid). Continue it by filling in, one line each: " + " / ".join(PLAN_LINES)
              + " Then write </think> on its own line and, after it, only the reply (no labels such as 'Reply:'). The reply opens by "
-             "reflecting their feeling as planned, in a warm and specific way, then does everything under 'Must do this turn'. When "
+             "reflecting their feeling as planned, in a warm and specific way, then does what 'This turn' says. When "
              "you reflect, never echo dying, leaving or an ending as love, strength or relief (not \"that's not weakness, that's "
-             "love\" about leaving, not \"an ending feels like the only relief\"); name the pain, not the wish. Ask a "
-             "question only when the plan needs one. Match the length of their message.")
+             "love\" about leaving, not \"an ending feels like the only relief\"); name the pain, not the wish. Ask at most "
+             "one question. Match the length of their message.")
 # 자체 생각 모드 챗봇 (Qwen3-8B): 생각 블록을 미리 채울 수 없어서 계획을 시스템 프롬프트로 주고 생각 첫머리에 옮겨 쓰게 한다
 PLAN_NATIVE = ("In your thinking, start with this plan. Its first lines are decided for you; copy them, then fill in the rest, one "
-               "line each, and make the reply do everything under 'Must do this turn':\n{plan}\n" + "\n".join(PLAN_LINES[1:]))
+               "line each, and make the reply reflect their feeling first and then do what 'This turn' says:\n{plan}\n"
+               + "\n".join(PLAN_LINES[1:]))
+
+
+# 2026-11-01 사용자: 위험 턴 (계획 칸) 의 시스템 프롬프트를 줄인다. 첫 판 (1101)plan_v2_30b) 은 역할·답 형식·정서 지지 문장을 같이 빼서
+# 위험 턴 17% 에서 챗봇이 사용자 대사를 대신 쓰거나 빈 답을 냈고 끝 감정이 46.0 → 역할·정서 지지·답 형식 줄을 다시 넣었다. 할 일 (안전 확인 단계·축 행동) 은 계획 칸이 맡고, 시스템 프롬프트에는
+# 금지 사항·말투·켜진 축의 Do not 만 (전에는 위기 지침 Do 목록이 '109 now'·'언제 어디서' 를 단계 순서와 따로 매 턴 시켰다, 약 1,600 → 500단어)
+RISK_PROMPT = """You are a supportive conversation partner (the listener). Respond to what the person brings, keep them safe, and help them feel a little better. They have shown signs of suicide or self-harm risk, so their safety comes first, but emotional support still matters just as much: stay with their feelings, reflect them warmly and in their own details, and let them feel heard and less alone. Bring safety questions gently, inside that warmth, never as a checklist.
+
+Never:
+- give information about suicide or self-harm methods, doses, lethality or how to hide it (asking whether they have the means, or helping put it away, is fine);
+- agree with harmful beliefs ("they'd be better off without you", "you're worthless") or justify or encourage suicide or self-harm;
+- affirm, praise or normalize a wish to die, to rest for good, to give up or to say a final goodbye (not "It makes sense that you're done"); name the pain instead;
+- pass over a hint or a plain statement about dying, a plan or means at hand;
+- promise they will be fine, promise to always be there, claim to be their therapist, diagnose or give medication advice ("I'm here with you right now" is fine);
+- judge, lecture or blame.
+
+Style: reflect something specific they said before anything else; ask at most one question; do not repeat yourself or a crisis line; no generic comfort ("I'm here for you", "you're not alone"); match their length (at most 60 words).{want}
+
+For what they have shown, also never: {dont}.
+
+Reply format: think inside <think></think> as described below, then write only your own reply to them as the listener. Never write their lines, the next turn, or labels such as "User:", "Assistant" or "Reply:"."""
+# 위기 지침 (crisis) 의 Do not 을 축마다 한 줄로
+RISK_DONT = {
+    "obtain_means": "ask about the amount, the type or how it would work, or agree to keep it a secret",
+    "suicide_note": "comment on, correct or praise the note, treat it only as expressing feelings, or help write or deliver it",
+    "put_affairs_in_order": "praise it as tidying up or a kind gesture, or help with the arrangements",
+    "specific_plan": "discuss or evaluate the plan, delay because the day is still some time away, or leave the next step vague",
+    "nonsuicidal_self_harm": "show shock or disappointment, ask about the wounds in detail, or treat it as a suicide attempt unless they also think of suicide",
+    "repeated_self_harm": "ask for promises to stop, call a relapse a failure, show shock, or ask about the wounds in detail",
+    "cannot_stay_safe": "try to calm them through talk alone, ask them to promise to stay safe, postpone reaching out, or change the topic",
+    "means_access": "avoid talking about the means or treat it only as a symbol, ask how they would use it, or assume it is fine because there is no date",
+    "method": "say anything about whether the method would work, dismiss it as just a thought, or jump to a hotline before understanding the thoughts",
+    "acute_context": "comfort them about the event alone and skip the risk check",
+    "psych_history": "assume their feelings are just their illness",
+    "substance_use_disorder": "dismiss what they say as just the alcohol talking",
+}
+# 원하는 방식이 잡혔으면 한 줄로만 (방식 지침 전체는 넣지 않는다)
+RISK_WANT = {"listen_vent": "keep reflections short and let them set the pace; do not give advice",
+             "deep_empathy": "show you really get what it is like for them, in their own words",
+             "practical_advice": "once the safety step is done, you can think with them about one small next step"}
+
+
+def assemble_risk(bank, on, need=None):
+    """위험 턴 (계획 칸) 의 짧은 시스템 프롬프트. 뒤에 PLAN_TAIL (또는 PLAN_NATIVE) 을 붙인다"""
+    r = route(on)
+    want = f"\nThey wanted {bank['strategies'][need]['label']}: {RISK_WANT[need]}." if need else ""
+    return RISK_PROMPT.format(want=want, dont="; ".join(RISK_DONT[k] for k in r["risk"] + r["mods"]))
 
 
 def assemble_route(bank, on, need=None, native=False, offered=False, offer=False):

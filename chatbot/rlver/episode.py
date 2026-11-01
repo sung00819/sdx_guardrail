@@ -39,14 +39,18 @@ def strip_plan(reply):
 # 앞 답에서 자살 생각을 직접 물었는지 (계획 칸에서 '다시 묻지 말 것' 으로 바꾼다). RISK_CHECK 보다 좁게: 상담 전화 이름은 빼고 질문만
 ASKED = re.compile(r"(thinking|thought|thoughts) (about|of) (ending (your|their) life|suicide|killing yourself|taking your (own )?life)|"
                    r"(do|did) you (mean|want to) (end your life|kill yourself)|(considering|planning) (suicide|ending your life)", re.I)
-WHERE_ASKED = re.compile(r"\bwhere (are|is) (they|it|that|those|the \w+|your \w+)\b|\bwhere (they|it|those|the \w+) (are|is)\b|"
+WHERE_ASKED = re.compile(r"\bhow close (are you|is it)\b|\bcan you (easily )?get (there|to it)\b|"
+                         r"\bwhere (are|is) (they|it|that|those|the \w+|your \w+)\b|\bwhere (they|it|those|the \w+) (are|is)\b|"
                          r"\bis it still (there|in|on)\b|\bstill (there|in your)\b.*\?", re.I)
 
 
-# 안전 확인 단계를 앞 답에서 이미 했는지 (strategy_bank.SAFETY_STEPS)
+# 안전 확인 단계를 앞 답에서 이미 했는지 (30B 판정기가 없을 때만, 2026-11-01 부터 기본은 need_llm.safety_status)
 PLAN_ASKED = re.compile(r"\b(a plan|any plans?|planned|planning)\b[^.?!]*\?|\b(when|where) (would|will|are) you (thinking|planning|going)\b|"
                         r"\b(a|any) (time|date|day|place) in mind\b", re.I)
 MEANS_ASKED = re.compile(r"\b(have|got|keep) (the |any )?(pills|medication|means|knife|blade|cord|rope|chemicals|anything)\b[^.?!]*\?", re.I)
+# 수단과 거리 두기를 도왔는지 (2026-11-01)
+DISTANCE_HELPED = re.compile(r"\b(put|move|keep|lock) (it|them|the \w+) (away|somewhere|in another room|out of)|\bhand (it|them) (to|over)|"
+                             r"\bgive (it|them) to\b|\b(some )?distance between\b|\bget (it|them) out of\b|\banother room\b", re.I)
 SAFETY_ASKED = re.compile(r"\bare you safe\b|\bsafe right now\b|\bare you alone\b|\banyone (with you|nearby|who can)\b|"
                           r"\bsomeone (who can|to) (be|stay|come)\b|\b109\b", re.I)
 
@@ -56,7 +60,7 @@ def asked_suicide(text):
     return any(not re.search(r"\bif\b[^.?!]*$", text[max(0, m.start() - 60):m.start()], re.I) for m in ASKED.finditer(text))
 
 
-PLAN_LABEL = re.compile(r"^\s*(jev signals|they want|must do this turn|what they said|any other risk|the one question|what to avoid|"
+PLAN_LABEL = re.compile(r"^\s*(jev signals|they want|must do this turn|risk signs|safety check so far|this turn|avoid|what they said|any other risk|the one question|what to avoid|"
                         r"reply format|reply|response)\b.*", re.I)
 
 
@@ -120,6 +124,21 @@ OFFER_REDO_NOTE = ("Your draft for this reply was:\n\"{draft}\"\nIt was meant to
                    "in words that fit their situation, clearly different from each other.")
 
 
+# 2026-11-01: 짧은 위험 프롬프트 첫 판에서 30B 가 </think> 뒤에 다음 턴 ('user\n…') 을 이어 쓰거나 'Assistant' 꼬리표를 붙였다 (172/997)
+ROLE_STOP = ["\nuser\n", "\nUser:", "\nPerson:", "\nuser:"]
+ROLE_LEAK = re.compile(r"^\s*(user|person)\s*[:\n]", re.I)
+ROLE_LABEL = re.compile(r"^\s*(assistant|listener)\s*[:\n]\s*", re.I)
+
+
+USER_ASKED = re.compile(r"\?\s*$|\bwhat (should|do|can|could) i do\b|\bhow (do|can|should) i\b|\bshould i\b", re.I | re.M)
+
+
+def clean_role(reply):
+    """→ (답, 쓸 수 있는지). 'Assistant' 꼬리표는 떼고, 사용자 대사로 시작하거나 비면 못 쓴다"""
+    reply = ROLE_LABEL.sub("", reply or "", count=1).strip()
+    return reply, bool(reply) and reply != "..." and not ROLE_LEAK.match(reply)
+
+
 def route_now(turns):
     return turns[-1].get("route", {})
 
@@ -136,7 +155,7 @@ def plan_then_reply(bot, messages, block, temperature=None):
             break
     head = "\n".join(keep).rstrip() + "\n</think>\n"
     for _ in range(3):  # 30B 가 </think> 뒤에 바로 끝내는 일이 있다 (스모크 1/3 대화에서 빈 답)
-        raw = bot(messages, prefill=head, temperature=temperature)
+        raw = bot(messages, prefill=head, temperature=temperature, stop=ROLE_STOP)
         if raw[len(head):].strip():
             return raw
     return raw
@@ -161,12 +180,8 @@ def jev_route(messages, jev, state, native=False, plan=False):
     on = strategy_bank.fired(probs)
     # 한 번 켜진 위험 축은 대화 끝까지 켜 둔다 (2026-10-26 사용자): 날짜·계획을 말한 발화가 3개 창 밖으로 밀리면 위험 축이 꺼지고,
     # 우울 모듈만 남은 턴에서 30B 가 '그건 힘이야', '그냥 평화야' 처럼 떠남·끝을 받아 줬다. 보정 3개는 그대로 턴마다
-    # 2026-11-01: 우울이나 다른 위험 축과 같이 켜진 적이 있는 축만 유지한다. normal 사용자의 '일요일에 다리까지' 처럼
-    # 축 하나만 혼자 켜진 오판이 대화 끝까지 위기 모드로 남았다 (out/rlver/1101)normal_jev_fp.md)
-    risk_now = [k for k in strategy_bank.RISK_AXES if on.get(k)]
-    if len(risk_now) > 1 or on.get("depression"):
-        state.setdefault("risk_backed", []).extend(k for k in risk_now if k not in state.get("risk_backed", []))
-    sticky = [k for k in state.setdefault("risk_seen", []) if not on.get(k) and k in state.get("risk_backed", [])]
+    # 2026-11-01 사용자: 다른 축과 같이 켜진 적이 있는 축만 유지하던 조건 (out/rlver/1101)normal_jev_fp.md) 은 빼고 다시 무조건 유지
+    sticky = [k for k in state.setdefault("risk_seen", []) if not on.get(k)]
     new = [k for k in strategy_bank.RISK_AXES if on.get(k) and k not in state["risk_seen"]]
     state["risk_seen"] += new
     for k in sticky:
@@ -193,11 +208,70 @@ def jev_route(messages, jev, state, native=False, plan=False):
             text = text.replace(bank["reply_format"]["tags"], REPLY_ONLY)
         plan = False
     if plan:
+        # 2026-11-01 사용자: 안전 확인 진행은 30B 가 대화 전체를 보고 판정한다 (물었는지만이 아니라 답했는지·거절했는지).
+        # 30B 판정기가 없으면 (--need_judge jev) 전처럼 앞 답 정규식으로 물었으면 answered
         prev = [m["content"] for m in messages if m["role"] == "assistant"]
-        done = {"suicide": any(asked_suicide(t) for t in prev), "plan": any(PLAN_ASKED.search(t) for t in prev),
-                "means": any(WHERE_ASKED.search(t) or MEANS_ASKED.search(t) for t in prev),
-                "safety": any(SAFETY_ASKED.search(t) for t in prev)}
-        block = strategy_bank.plan_block(on, need=state["need"], offer=offer, fill=bank.get("fill"), done=done, new=new)
+        asked = {"suicide": any(asked_suicide(t) for t in prev), "plan": any(PLAN_ASKED.search(t) for t in prev),
+                 "means": any(WHERE_ASKED.search(t) or MEANS_ASKED.search(t) for t in prev),
+                 "safety": any(SAFETY_ASKED.search(t) for t in prev)}
+        if state.get("need_llm"):
+            got = need_llm.safety_status(messages, state["need_llm"])
+            # 2026-11-01: 30B 가 힌트만으로 '자살 생각: 답함' 이라 해서 직접 묻지 않았다 (확인이 필요한 46/50 중 50% 만 물음,
+            # v1 은 82%). 자살 생각은 챗봇이 직접 물었을 때만 끝난 것으로, 수단은 물었거나 사용자가 위치를 말했을 때만
+            if not asked["suicide"]:
+                got["suicide"] = {"status": "not_asked", "note": ""}
+            # 수단은 위치를 아는 것보다 거리를 두게 돕는 게 목적이다. 사용자가 먼저 위치를 말했어도 (v6: 건너뛴 16/16 이 그 경우)
+            # 챗봇이 위치를 묻거나 거리 두기를 도운 뒤에만 끝난 것으로 본다. 말한 위치는 메모로 남겨 단계 문장에 쓴다
+            if not (asked["means"] or any(DISTANCE_HELPED.search(t) for t in prev)):
+                got["means"] = {"status": "not_asked", "note": got["means"].get("note", "") if got["means"]["status"] == "answered" else ""}
+            # 안전 (지금 안전한지 · 곁에 누가 · 109) 도 챗봇이 묻거나 안내했을 때만 (v5: '답함' 30 중 26 대화가 한 번도 안 물음)
+            if not asked["safety"]:
+                got["safety"] = {"status": "not_asked", "note": ""}
+        else:
+            got = {k: {"status": "answered" if v else "not_asked"} for k, v in asked.items()}
+        rank = {"not_asked": 0, "no_answer": 1, "declined": 2, "answered": 3}
+        safety = state.setdefault("safety", {})
+        if new and safety:  # 새 위험 축이 켜지면 거절했던 단계를 한 번 더
+            state["retry"] = [k for k, v in safety.items() if v["status"] == "declined"]
+        for k, v in got.items():  # 대화가 쌓일수록 상태는 올라가기만 한다
+            if rank[v["status"]] >= rank[safety.get(k, {"status": "not_asked"})["status"]]:
+                safety[k] = v
+        status = {k: v["status"] for k, v in safety.items()}
+        notes = {k: v.get("note", "") for k, v in safety.items() if v["status"] == "answered" or (k == "means" and v.get("note"))}
+        step, revisit = strategy_bank.next_step(strategy_bank.step_order(route["risk"]), status, state.get("revisited", []),
+                                                state.get("retry", []))
+        # 축 행동: 새로 켜진 위험·보정 축을 줄에 쌓고 위험 턴마다 우선순위가 높은 것 하나 (축이 꺼져도 줄에 남긴다, 사용자)
+        queue, used = state.setdefault("action_queue", []), state.setdefault("action_done", [])
+        queue += [k for k in route["risk"] + route["mods"] if k in strategy_bank.AXIS_ACTION and k not in queue + used]
+        # 2026-11-01: 위험 턴마다 질문하면 감정이 안 오른다 (질문 턴 뒤 +0.8, 아닌 턴 +4.3, 1101)plan_v3_30b_50).
+        # 앞 턴에 안전 질문을 했는데 답이 없으면 이번 턴은 쉰다 (답했으면 다음 단계로). 급한 축의 자살 생각 · 안전 단계는 쉬지 않는다.
+        # 사용자가 물었으면 먼저 답하고, 그 턴에는 (급한 단계가 아니면) 안전 질문을 하지 않는다
+        # 수단 접근 · 수단 마련이면 수단 위치 단계도 쉬지 않는다 (v5: 수단 확인 8/18, 수단 단계 3턴)
+        urgent = ((bool(strategy_bank.URGENT & set(route["risk"])) and step in ("suicide", "safety"))
+                  or (step == "means" and bool(strategy_bank.MEANS_FIRST & set(route["risk"]))))
+        last = state.get("last_asked")
+        rest = bool(last) and not urgent and status.get(last) != "answered"
+        answer_first = bool(USER_ASKED.search(messages[-1]["content"]))
+        ask_step = step is not None and (urgent or not (rest or answer_first))
+        action = strategy_bank.pick_action(queue, step, allow_question=ask_step)
+        if action:
+            queue.remove(action)
+            used.append(action)
+        contact = step is None and not state.get("contact_done") and not (rest or answer_first)
+        state["contact_done"] = state.get("contact_done") or contact
+        asks = ask_step and (not (action and strategy_bank.AXIS_ACTION[action][1]) or strategy_bank.merged(action, step, route["risk"]))
+        if asks:  # 이번 턴에 단계를 실제로 시킬 때만
+            if revisit:
+                state.setdefault("revisited", []).append(step)
+            if step in state.get("retry", []):
+                state["retry"].remove(step)
+        state["last_asked"] = step if asks else ("action" if action and strategy_bank.AXIS_ACTION[action][1] else ("contact" if contact else None))
+        block = strategy_bank.plan_block(on, fill=bank.get("fill"), status=status, notes=notes, action=action, step=step, revisit=revisit,
+                                         ask_step=asks or (action is not None and strategy_bank.AXIS_ACTION[action][1]),
+                                         answer_first=answer_first, contact=contact)
+        if state.get("risk_prompt", "compact") == "compact":  # 2026-11-01: 위험 턴은 짧은 시스템 프롬프트 (--risk_prompt full 이면 전처럼)
+            text = strategy_bank.assemble_risk(bank, on, state["need"])
+        route = {**route, "safety": status, "action": action, "step": step if asks else None, "rest": rest, "answer_first": answer_first}
         if native:
             text += "\n\n" + strategy_bank.PLAN_NATIVE.format(plan=block.replace("<think>\n", ""))
         else:
@@ -209,7 +283,8 @@ def jev_route(messages, jev, state, native=False, plan=False):
 
 def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=True, jev=None, need_opts=None):
     """jev: template bank_jev·bank_jev_plan 일 때 jev.Jev (판정기)
-    need_opts (2026-11-01): {"need_llm": 방식 판정 Chat (없으면 Jev), "offer_style": "once"|"question"|"question2", "reoffer": bool}"""
+    need_opts (2026-11-01): {"need_llm": 방식 판정 Chat (없으면 Jev), "offer_style": "once"|"question"|"question2", "reoffer": bool,
+    "risk_prompt": "compact"|"full" (계획 칸 위험 턴의 시스템 프롬프트)}"""
     need_opts = need_opts or {}
     emo, ep = cfg["emotion"], cfg["episode"]
     assert template not in ("bank_jev", "bank_jev_plan") or jev is not None, "bank_jev 는 jev 판정기가 필요하다"
@@ -219,7 +294,7 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
     turns, end = [{"user": first, "user_thinking": first_thinking, "emotion": user.emotion}], "max_turns"
     native = getattr(bot, "native_think", False)
     jev_state = {"need": None, "offered": False, "await": False,
-                 **{k: need_opts[k] for k in ("need_llm", "offer_style", "reoffer") if need_opts.get(k)}}
+                 **{k: need_opts[k] for k in ("need_llm", "offer_style", "reoffer", "risk_prompt") if need_opts.get(k)}}
     for _ in range(ep["max_turns"]):
         prefill = None
         if template in ("bank_jev", "bank_jev_plan"):
@@ -254,6 +329,15 @@ def run_episode(profile, bot, sim_llm, cfg, template="think", use_first_talk=Tru
                 reply, ok = parse_bot(raw, fmt)
             else:
                 offer_missing = need_llm.offer_missing(reply, jev_state["need_llm"])
+        for _ in range(2):  # 역할이 섞였거나 빈 답이면 다시 쓴다
+            reply, usable = clean_role(reply)
+            if usable:
+                break
+            redo += 1
+            raw = plan_then_reply(bot, messages, prefill, temperature=1.0) if prefill else bot(messages, temperature=1.0)
+            reply, ok = parse_bot(raw, fmt)
+        else:
+            reply, _ = clean_role(reply)
         if not reply:
             reply, ok = "...", False
         if offer_missing:

@@ -89,6 +89,8 @@ def main():
                     help="원하는 방식 판정. 2026-11-01 사용자: 기본 llm (시뮬레이터 30B, need_llm.judge_need), jev 는 이전 실행 재현용")
     ap.add_argument("--offer", choices=["once", "question", "question2"], default="question",
                     help="방식 권하기: question = 짧은 질문으로 끝냄 (기본), question2 = 상황 맞춤 + 세 방식 확인·다시 쓰기, once = 이전 OFFER")
+    ap.add_argument("--risk_prompt", choices=["compact", "full"], default="compact",
+                    help="bank_jev_plan 위험 턴의 시스템 프롬프트: compact = 금지·말투·Do not 만 (bank.assemble_risk), full = 이전 뱅크 조립")
     ap.add_argument("--no_reoffer", dest="reoffer", action="store_false", help="답에서 방식이 안 드러나도 다시 묻지 않는다 (이전 동작)")
     ap.add_argument("--samples", type=int, default=1, help="프로필마다 대화 수 (GRPO 그룹 크기)")
     ap.add_argument("--no_first_talk", action="store_true", help="테스트 프로필의 고정 첫 발화 대신 시뮬레이터가 연다")
@@ -138,7 +140,7 @@ def main():
     json.dump({**vars(args), "chatbot_cfg": bot_cfg}, open(os.path.join(args.out, "run_args.json"), "w"), indent=1)
     print(f"사용자 (배경 × 설정) {len(profiles)} × 표본 {args.samples} → 남은 대화 {len(jobs)}")
 
-    need_opts = {"offer_style": args.offer, "reoffer": args.reoffer,
+    need_opts = {"offer_style": args.offer, "reoffer": args.reoffer, "risk_prompt": args.risk_prompt,
                  "need_llm": Chat({**cfg["simulator"], "temperature": 0}) if args.need_judge == "llm" else None}
 
     def one(job):

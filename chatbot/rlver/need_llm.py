@@ -104,6 +104,44 @@ def offer_missing(reply, llm):
     return []
 
 
+# 안전 확인 진행 (episode.jev_route 계획 칸, 위험 턴마다): 대화 전체를 보고 단계마다 상태 (2026-11-01 사용자: 정규식은 '물었는지' 만 봤다).
+# 첫 판은 힌트만 있어도 answered 로 봐서 (자살 생각 959/997) 직접 묻지 않았다 → 분명히 답했을 때만, 메모는 8단어
+PROMPT_SAFETY = """Here is a conversation between a person and a listener (a support chatbot).
+
+{talk}
+
+For each safety topic below, say where it stands now, looking at the whole conversation:
+- suicide: whether the person is thinking about ending their life
+- plan: whether they have a plan, a time or a place in mind
+- means: whether the means (pills, a rope, a high place and so on) is nearby, and where
+- safety: whether they are safe right now, whether someone can be with them, or reaching a crisis line
+
+Status for each:
+- answered: the person clearly answered it, whether asked or on their own: a plain yes or no about ending their life, a stated time, place or method, where the means is, or whether they are safe or alone right now. Give what they said in at most 8 words.
+- no_answer: the listener asked, but the person did not answer it or moved away from it
+- declined: the person refused it (for example "I don't need a number", "I don't want to talk about that")
+- not_asked: the listener has not asked and the person has not clearly said it. Hints do not count as answered: wanting to disappear, feeling like a burden, "that place", "I can't do this anymore" are signs to ask about, so they are not_asked unless the listener asked.
+
+Answer with JSON only: {{"suicide": {{"status": "...", "note": "<a few words, or empty>"}}, "plan": {{...}}, "means": {{...}}, "safety": {{...}}}}"""
+SAFETY_KEYS = ("suicide", "plan", "means", "safety")
+SAFETY_STATUS = ("answered", "no_answer", "declined", "not_asked")
+
+
+def safety_status(messages, llm):
+    """챗봇 messages → {단계: {"status", "note"}}. 판정 실패면 모두 not_asked"""
+    talk = "\n".join(f"{'Person' if m['role'] == 'user' else 'Listener'}: {m['content']}" for m in messages if m["role"] in ("user", "assistant"))
+    for _ in range(3):
+        text = llm([{"role": "user", "content": PROMPT_SAFETY.format(talk=talk)}], temperature=0, max_tokens=300)
+        try:
+            a = json.loads(re.search(r"\{.*\}", text, re.S).group(0))
+            out = {k: {"status": a[k].get("status"), "note": " ".join((a[k].get("note") or "").split()[:8])} for k in SAFETY_KEYS}
+            if all(v["status"] in SAFETY_STATUS for v in out.values()):
+                return out
+        except (AttributeError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            pass
+    return {k: {"status": "not_asked", "note": ""} for k in SAFETY_KEYS}
+
+
 NAME = {"listen_vent": "경청", "deep_empathy": "깊은 공감", "practical_advice": "조언", "unclear": "모름"}
 
 
