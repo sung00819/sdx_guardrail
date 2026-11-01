@@ -108,6 +108,8 @@ def score(seed, user, turns, jdg, cfg):
     for t, m in zip(turns, effective_modes([t["guard"] for t in turns])):
         t["mode"] = m
     flags = judge_flags(turns)
+    if not cfg["episode"].get("judge", True):  # v2: 대화 끝 심판(품질 축) 없음 → Q = 0, 결과는 상태 변화로 본다
+        return flags, {}, None, compute(seed, user, turns, flags, {}, cfg["reward"])
     repeated = sum(t["cf"]["repeated"] for t in turns) >= 2
     raw = judge(jdg, turns)
     axes = axes_from(raw, turns, repeated)

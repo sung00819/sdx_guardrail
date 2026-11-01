@@ -296,7 +296,7 @@ def difficulty(stance, disclosure):
     return "medium"
 
 
-def build(n, split, seed):
+def build(n, split, seed, v2=False):
     rng = random.Random(seed)
     region_rng = random.Random(f"{seed}-region")  # 지역은 따로 뽑아 다른 값은 지역을 넣기 전과 같게 둔다
     means_rng = random.Random(f"{seed}-means")  # 안전 유지 불가의 수단 (나중에 추가)
@@ -358,6 +358,10 @@ def build(n, split, seed):
                 "hidden_need": needs[i],
                 "difficulty": difficulty(stance, disclosure),
             })
+    if v2:  # PERSONA_V2.md: 욕구는 뽑기만 하고 버린다 → 나머지 시드는 v1 과 같다
+        for r in rows:
+            del r["hidden_need"]
+            r["version"] = "v2"
     rng.shuffle(rows)
     return rows
 
@@ -365,7 +369,8 @@ def build(n, split, seed):
 def summary(rows):
     for key in ("cell", "true_response", "stance", "disclosure", "reveal_level", "risk_fact", "means", "effort",
                 "age_band", "gender", "hidden_need", "difficulty"):
-        print(f"{key:14s}", dict(Counter(r[key] for r in rows).most_common()))
+        if key in rows[0]:
+            print(f"{key:14s}", dict(Counter(r[key] for r in rows).most_common()))
     for c in CELLS:
         sub = [r for r in rows if r["cell"] == c]
         mean = {f: round(sum(r["big_five"][f] for r in sub) / len(sub), 1) for f in FACTORS}
@@ -378,8 +383,9 @@ def main():
     ap.add_argument("--split", default="train")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--v2", action="store_true", help="PERSONA_V2.md: hidden_need 없음")
     args = ap.parse_args()
-    rows = build(args.n, args.split, args.seed)
+    rows = build(args.n, args.split, args.seed, args.v2)
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     with open(args.out, "w") as f:
         for r in rows:

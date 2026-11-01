@@ -6,6 +6,9 @@ ResidencyRL 3.1 의 Stage 2(생성)·3(LLM 검수: accept/modify/reject)·4(TF-I
   python chatbot/gen_scene.py --seeds out/pilot_seeds.json --model openai/gpt-6-luna \\
       --check-model openai/gpt-6-sol --out out/pilot_luna.jsonl
   python chatbot/gen_scene.py --dedup out/scenes_train.jsonl
+
+v2 (PERSONA_V2.md): v1 결과에서 시드(hidden_need 뺌)·페르소나를 그대로 가져오고 배경만 다시 생성·검수한다.
+  python chatbot/gen_scene.py --v2 --from-v1 out/scenes_train.jsonl --model openai/gpt-6-sol --out out/v2/scenes_train.jsonl
 """
 
 import argparse
@@ -69,14 +72,17 @@ def apply_fixes(persona, scene, fixes):
             persona[field] = value
 
 
-def generate(session, seed, model, check_model):
-    out = {"id": seed["id"], "seed": seed, "model": model, "check_model": check_model, "cost": 0.0, "error": None}
-    persona, c, raw = chat_json(session, model, PERSONA_PROMPT.format(seed=describe_persona_seed(seed)))
-    out["cost"] += c
+def generate(session, seed, model, check_model, v2=False, persona=None):
+    """persona 를 주면 페르소나 단계를 건너뛴다 (v2 --from-v1: 같은 사람, 배경만 새로)"""
+    out = {"id": seed["id"], "seed": seed, "model": model, "check_model": check_model, "cost": 0.0, "error": None,
+           "version": "v2" if v2 else "v1", "persona_reused": persona is not None}
     if persona is None:
-        out["error"] = {"step": "persona", "raw": raw[:500]}
-        return out
-    scene, c, raw = chat_json(session, model, scene_prompt(seed, persona))
+        persona, c, raw = chat_json(session, model, PERSONA_PROMPT.format(seed=describe_persona_seed(seed)))
+        out["cost"] += c
+        if persona is None:
+            out["error"] = {"step": "persona", "raw": raw[:500]}
+            return out
+    scene, c, raw = chat_json(session, model, scene_prompt(seed, persona, v2))
     out["cost"] += c
     if scene is None:
         out.update(persona=persona, error={"step": "scene", "raw": raw[:500]})
@@ -123,12 +129,24 @@ def main():
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--dedup", help="생성 결과 파일에 중복 표시만 한다")
     ap.add_argument("--redo-reject", action="store_true", help="검수 reject·check_failed 도 다시 생성한다")
+    ap.add_argument("--v2", action="store_true", help="PERSONA_V2.md: 욕구·인물별 감정 규칙 없는 배경")
+    ap.add_argument("--from-v1", help="v1 결과 파일: 시드(hidden_need 뺌)와 페르소나를 가져와 배경만 생성")
     args = ap.parse_args()
     if args.dedup:
         return dedup(args.dedup)
 
-    text = open(args.seeds).read()
-    seeds = json.loads(text) if args.seeds.endswith(".json") else [json.loads(l) for l in text.splitlines() if l]
+    personas = {}
+    if args.from_v1:  # 시드 정본은 결과 파일 안의 seed (SIMULATOR_PERSONA.md 4절)
+        seeds = []
+        for line in open(args.from_v1):
+            r = json.loads(line)
+            seed = {k: v for k, v in r["seed"].items() if k != "hidden_need"}
+            seed["version"] = "v2"
+            seeds.append(seed)
+            personas[seed["id"]] = r["persona"]
+    else:
+        text = open(args.seeds).read()
+        seeds = json.loads(text) if args.seeds.endswith(".json") else [json.loads(l) for l in text.splitlines() if l]
     seeds = seeds[: args.limit] if args.limit else seeds
     # 끝난 것은 하나씩 바로 쓰고, 다시 실행하면 오류 없이 끝난 id 는 건너뛴다 (이어 돌리기)
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
@@ -148,7 +166,7 @@ def main():
         for r in done.values():
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
         with ThreadPoolExecutor(args.workers) as ex:
-            futures = [ex.submit(generate, session, s, args.model, args.check_model) for s in todo]
+            futures = [ex.submit(generate, session, s, args.model, args.check_model, args.v2, personas.get(s["id"])) for s in todo]
             for i, fut in enumerate(as_completed(futures), 1):
                 r = fut.result()
                 done[r["id"]] = r
