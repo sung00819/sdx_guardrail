@@ -15,6 +15,7 @@ from rules import EXCLUDED, ROOT, load_design, respond, yes
 #   reasons     측정: 수준을 정한 임상 신호. 상향 코드(escalated_*)는 빼서 upgraded_by 로 옮긴다
 #   context     측정: Jev 가 '예'라고 한 맥락 요인. 상향 여부와 상관없이 항상 넣는다 (상향 때만 남기면 수단 정보가 85~97% 빠졌다)
 #   upgraded_by 규칙: 맥락 요인으로 한 단계 올렸으면 그 요인, 아니면 null
+#   findings    측정: 시점·수준과 상관없이 Jev 가 본 항목별 사실 (t11f). 모든 출력에 항상 들어간다
 CONTEXT_QUESTIONS = ("means_access", "acute_context")
 UPGRADE_CODE = {"escalated_means_access": "means_access", "escalated_acute_context": "acute_context"}
 
@@ -26,10 +27,11 @@ def codes(a, levels):
     upgraded_by = next((UPGRADE_CODE[c] for c in reasons if c in UPGRADE_CODE), None)
     reasons = [c for c in reasons if c not in UPGRADE_CODE]
     context = [q for q in CONTEXT_QUESTIONS if yes(a, q)]
-    if response == EXCLUDED:  # 다른 사람 이야기: 사용자 본인의 신호·맥락이 아니다
+    findings = levels.findings(a)  # 항상 낸다 (설계에 findings 가 없으면 여기서 실패하게 둔다)
+    if response == EXCLUDED:  # 다른 사람 이야기: 사용자 본인의 신호·맥락이 아니다. findings 는 측정값이라 그대로 둔다
         level, chronic, reasons, context, upgraded_by = EXCLUDED, [], ["other_person"], [], None
     return {"level": level, "response": response, "reasons": reasons, "context": context,
-            "upgraded_by": upgraded_by, "chronic": chronic}
+            "upgraded_by": upgraded_by, "chronic": chronic, "findings": findings}
 
 
 def combine(rows, design):

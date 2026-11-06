@@ -9,12 +9,12 @@ base-eval 은 '지난 1개월' 기준이라 대화 뒤에 점수가 내려갈 �
 
 # [결정 필요] 가중치는 전문가 확인 전 초안
 WEIGHTS = {
-    "ideation": 0.25,          # 자살 사고 단계 (0~3) × 현재성
-    "intent": 0.25,            # 실행 의도 (0 없음 / 1 약간·양가 / 2 확실) × 현재성
-    "plan": 0.10,              # 계획 구체성 (0~3) × 현재성
+    "ideation": 0.25,          # 자살 사고 (예 확률) × 현재성
+    "intent": 0.25,            # 실행 의도 (없음 0 / 양가·불명 0.5 / 표명·임박 1) × 현재성
+    "plan": 0.10,              # 구체성 (방법 고려 1/3 / 구체적 계획 1) × 현재성
     "cannot_stay_safe": 0.20,  # 혼자 안전 유지 불가 표명
     "warning_signs": 0.10,     # 간접 경고신호 (절망, 갇힌 느낌, 짐이 됨, 철수)
-    "self_harm": 0.10,         # 자해 단계 (1 충동 · 2 행동 · 3 반복·심함) × 현재성
+    "self_harm": 0.10,         # 자해 (충동 1/3 · 행동 2/3 · 반복·장기간·치료 필요 1) × 현재성
 }
 NOW, RECENT = 5, 4  # 시점 단계: 5 지금 · 4 1개월 안
 RECENT_WEIGHT = 0.5
@@ -35,17 +35,29 @@ def currentness(time_probs):
     return (float(time_probs.get(str(NOW), 0)) + RECENT_WEIGHT * float(time_probs.get(str(RECENT), 0))) / rest
 
 
+def p(a, q, *options):
+    """선택형 질문 q 에서 options 확률의 합"""
+    probs = a.get(f"{q}_probs") or {}
+    return sum(float(probs.get(o, 0)) for o in options)
+
+
 def components(a):
-    """a = 발화 하나의 expert11 Jev 답 (flatten 된 dict)"""
+    """a = 발화 하나의 expert11 Jev 답 (flatten 된 dict). t11f 질문 기준이고, 각 값의 척도는 t11e 와 같게 맞췄다
+    (의도: 양가 0.5 · 표명 1, 계획: 방법만 1/3 · 구체적 계획 1, 자해: 충동 1/3 · 행동 2/3 · 반복·장기간·치료 필요 1)."""
     cur_si = currentness(a.get("t_ideation_probs"))
     cur_sh = currentness(a.get("t_self_harm_probs"))
+    si = float(a.get("suicidal_ideation") or 0)
+    sh = float(a.get("self_harm") or 0)
+    severe = max(p(a, "sh_frequency", "repeated"), p(a, "sh_duration", "sustained"),
+                 p(a, "sh_severity", "medical_care", "life_threatening"))
     return {
-        "ideation": expected(a.get("suicide_ideation_probs"), 3) * cur_si,
-        "intent": expected(a.get("suicide_intent_probs"), 2) * cur_si,
-        "plan": expected(a.get("suicide_plan_probs"), 3) * cur_si,
+        "ideation": si * cur_si,
+        "intent": si * (p(a, "suicidal_intent", "imminent", "intent") + 0.5 * p(a, "suicidal_intent", "ambivalent_or_unclear")) * cur_si,
+        "plan": si * max(float(a.get("ideation_plan") or 0), float(a.get("ideation_method") or 0) / 3) * cur_si,
         "cannot_stay_safe": float(a.get("cannot_stay_safe") or 0),
         "warning_signs": float(a.get("warning_signs") or 0),
-        "self_harm": expected(a.get("sh_level_probs"), 3) * cur_sh,
+        # 자해 충동은 질문이 '지금·최근'만 묻으므로 현재성을 곱하지 않는다
+        "self_harm": max(sh * (2 + severe) / 3 * cur_sh, (1 - sh) * float(a.get("sh_urge") or 0) / 3),
     }
 
 

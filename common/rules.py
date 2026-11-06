@@ -2,7 +2,7 @@
 
 - 점수 질문: Jev 점수가 k - 0.5 이상이면 k 단계 이상으로 본다 (THRESHOLD_MODE = "score"). 누적 확률 방식도 남겨 둠.
 - 예/아니오 질문: '예' 확률 ≥ YES_PROB.
-- 선택형 질문: 고른 값의 신뢰도 ≥ CONF.
+- 선택형 질문: 고른 값의 신뢰도 ≥ CONF. 수준 규칙(t11f)에서는 위험 쪽 선택지 확률의 합 ≥ P_ON (has).
 - 대응 수준: 전문가 검수 자료 슬라이드 8 (급성 수준 × 만성 위험 표지).
 """
 
@@ -64,6 +64,22 @@ def at_least(a, q, k):
     if THRESHOLD_MODE == "score":
         return (a.get(q) or 0) >= k - 0.5
     return p_ge(a.get(f"{q}_probs"), k) >= P_ON
+
+
+def has(a, q, *options):
+    """선택형 질문 q 에서 options 확률의 합 ≥ P_ON 인지 (t11f: 위험 쪽으로 순서가 있는 선택지를 묶어 본다.
+    고른 값 하나의 신뢰도 ≥ CONF 로 보면 두 선택지에 확률이 나뉠 때 놓친다)"""
+    probs = a.get(f"{q}_probs")
+    if not probs:  # 확률이 없으면 고른 값과 신뢰도로 본다
+        return a.get(q) in options and (a.get(f"{q}_conf") or 0) >= CONF
+    return sum(float(probs.get(o, 0)) for o in options) >= P_ON
+
+
+def top(a, q):
+    """선택형 질문 q 에서 확률이 P_ON 이상인 선택지 (없으면 None)"""
+    probs = a.get(f"{q}_probs") or {}
+    best = max(probs, key=lambda o: float(probs[o]), default=None)
+    return best if best is not None and float(probs[best]) >= P_ON else None
 
 
 def recent(a, q, k, unknown):

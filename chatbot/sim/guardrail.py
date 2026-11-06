@@ -37,6 +37,6 @@ class Guardrail:
 def chatbot_block(out):
     """챗봇에 주는 [guardrail] 블록 (RESPONSE_GUIDE.md 1절). upgraded_by·risk 는 주지 않는다."""
     lines = ["[guardrail]", f"level: {out['level']}", f"response: {out['response']}"]
-    for k in ("reasons", "context", "chronic"):
+    for k in ("reasons", "context", "chronic", "findings"):
         lines.append(f"{k}: {', '.join(out[k]) if out[k] else 'none'}")
     return "\n".join(lines)
